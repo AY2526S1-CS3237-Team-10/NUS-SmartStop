@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+
+# Flask
+instance/
+.webassets-cache
+
+# PyTorch
+*.pth
+*.pt
+*.onnx
+
+# TensorFlow
+*.h5
+*.pb
+saved_model/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+!docs/*.png
+!docs/*.jpg
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# Docker
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
