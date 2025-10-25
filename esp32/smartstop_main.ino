@@ -27,9 +27,10 @@ const char* flask_server = "http://YOUR_FLASK_SERVER_IP:5000";
 const char* device_id = "esp32_001";
 const char* location = "bus_stop_01";
 
-// MQTT topics
-const char* topic_sensors = "smartstop/sensors/ultrasonic/esp32_001";
-const char* topic_camera = "smartstop/camera/esp32_001";
+// MQTT topics (using nus-smartstop prefix)
+const char* topic_sensors = "nus-smartstop/sensors/ultrasonic";
+const char* topic_camera = "nus-smartstop/camera";
+const char* topic_command = "nus-smartstop/command/esp32_001";
 
 // Pin definitions for ESP32-CAM or external camera module
 // Adjust based on your specific ESP32 board and camera module
@@ -192,9 +193,9 @@ float read_ultrasonic() {
 }
 
 void send_sensor_data(float distance) {
-  // Create JSON payload
+  // Create JSON payload with deviceId (not device_id) for Telegraf
   String payload = "{";
-  payload += "\"device_id\":\"" + String(device_id) + "\",";
+  payload += "\"deviceId\":\"" + String(device_id) + "\",";
   payload += "\"location\":\"" + String(location) + "\",";
   payload += "\"distance\":" + String(distance) + ",";
   payload += "\"timestamp\":" + String(millis());
@@ -234,9 +235,9 @@ void capture_and_upload_image() {
   
   Serial.println("Image uploaded");
   
-  // Notify via MQTT
+  // Notify via MQTT with deviceId (not device_id) for Telegraf
   String mqtt_payload = "{";
-  mqtt_payload += "\"device_id\":\"" + String(device_id) + "\",";
+  mqtt_payload += "\"deviceId\":\"" + String(device_id) + "\",";
   mqtt_payload += "\"location\":\"" + String(location) + "\",";
   mqtt_payload += "\"event_type\":\"capture\",";
   mqtt_payload += "\"image_count\":1";
@@ -270,9 +271,8 @@ void reconnect_mqtt() {
     
     if (mqtt_client.connect(device_id)) {
       Serial.println("connected");
-      // Subscribe to command topic
-      String cmd_topic = "smartstop/command/" + String(device_id);
-      mqtt_client.subscribe(cmd_topic.c_str());
+      // Subscribe to command topic (using nus-smartstop prefix)
+      mqtt_client.subscribe(topic_command);
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqtt_client.state());

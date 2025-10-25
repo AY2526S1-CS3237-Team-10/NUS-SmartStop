@@ -191,13 +191,12 @@ curl -X POST \
 ### Topic Structure
 
 ```
-smartstop/
+nus-smartstop/
 ├── sensors/
-│   ├── ultrasonic/{device_id}
-│   ├── temperature/{device_id}
-│   └── humidity/{device_id}
-├── camera/
-│   └── {device_id}
+│   ├── ultrasonic
+│   ├── temperature
+│   └── humidity
+├── camera
 └── command/
     └── {device_id}
 ```
@@ -206,22 +205,24 @@ smartstop/
 
 ### Sensor Data Topics
 
-**Topic:** `smartstop/sensors/{sensor_type}/{device_id}`
+**Topic:** `nus-smartstop/sensors/{sensor_type}`
 
 **Payload Example (Ultrasonic):**
 ```json
 {
-  "device_id": "esp32_001",
+  "deviceId": "esp32_001",
   "location": "bus_stop_01",
   "distance": 125.5,
   "timestamp": 1634567890
 }
 ```
 
+**Note**: Use `deviceId` (not `device_id`) - it's configured as a tag key in Telegraf for filtering.
+
 **Payload Example (Temperature):**
 ```json
 {
-  "device_id": "esp32_001",
+  "deviceId": "esp32_001",
   "location": "bus_stop_01",
   "temperature": 28.5,
   "humidity": 65.0,
@@ -232,20 +233,20 @@ smartstop/
 **Publish Example:**
 ```bash
 mosquitto_pub -h localhost \
-  -t "smartstop/sensors/ultrasonic/esp32_001" \
-  -m '{"device_id":"esp32_001","location":"bus_stop_01","distance":125.5,"timestamp":1634567890}'
+  -t "nus-smartstop/sensors/ultrasonic" \
+  -m '{"deviceId":"esp32_001","location":"bus_stop_01","distance":125.5,"timestamp":1634567890}'
 ```
 
 ---
 
 ### Camera Event Topics
 
-**Topic:** `smartstop/camera/{device_id}`
+**Topic:** `nus-smartstop/camera`
 
 **Payload Example:**
 ```json
 {
-  "device_id": "esp32_001",
+  "deviceId": "esp32_001",
   "location": "bus_stop_01",
   "event_type": "capture",
   "image_count": 1,
@@ -256,15 +257,15 @@ mosquitto_pub -h localhost \
 **Publish Example:**
 ```bash
 mosquitto_pub -h localhost \
-  -t "smartstop/camera/esp32_001" \
-  -m '{"device_id":"esp32_001","location":"bus_stop_01","event_type":"capture","image_count":1}'
+  -t "nus-smartstop/camera" \
+  -m '{"deviceId":"esp32_001","location":"bus_stop_01","event_type":"capture","image_count":1}'
 ```
 
 ---
 
 ### Command Topics
 
-**Topic:** `smartstop/command/{device_id}`
+**Topic:** `nus-smartstop/command/{device_id}`
 
 **Payload Examples:**
 
@@ -289,11 +290,11 @@ Custom command:
 **Publish Example:**
 ```bash
 # Simple command
-mosquitto_pub -h localhost -t "smartstop/command/esp32_001" -m "BEEP"
+mosquitto_pub -h localhost -t "nus-smartstop/command/esp32_001" -m "BEEP"
 
 # JSON command
 mosquitto_pub -h localhost \
-  -t "smartstop/command/esp32_001" \
+  -t "nus-smartstop/command/esp32_001" \
   -m '{"command":"set_interval","value":60}'
 ```
 
@@ -306,14 +307,14 @@ mosquitto_pub -h localhost \
 mosquitto_sub -h localhost -t "#" -v
 ```
 
-**Subscribe to sensor topics:**
+**Subscribe to all nus-smartstop topics:**
 ```bash
-mosquitto_sub -h localhost -t "smartstop/sensors/#" -v
+mosquitto_sub -h localhost -t "nus-smartstop/#" -v
 ```
 
-**Subscribe to specific device:**
+**Subscribe to sensor topics only:**
 ```bash
-mosquitto_sub -h localhost -t "smartstop/+/esp32_001" -v
+mosquitto_sub -h localhost -t "nus-smartstop/sensors/#" -v
 ```
 
 ---

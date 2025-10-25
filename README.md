@@ -202,17 +202,16 @@ python server/flask/app.py
 ### Environment Variables (.env)
 
 ```bash
-# InfluxDB Configuration
-INFLUXDB_URL=http://localhost:8086
-INFLUXDB_TOKEN=your-super-secret-token
-INFLUXDB_ORG=smartstop
+# InfluxDB Configuration (External)
+INFLUXDB_URL=http://127.0.0.1:8086
+INFLUXDB_TOKEN=your-influxdb-token
+INFLUXDB_ORG=NUS SmartStop
 INFLUXDB_BUCKET=sensor_data
 
 # MQTT Configuration
-MQTT_BROKER=localhost
+MQTT_BROKER=127.0.0.1
 MQTT_PORT=1883
-MQTT_TOPIC_SENSORS=smartstop/sensors
-MQTT_TOPIC_CAMERA=smartstop/camera
+MQTT_TOPIC_PREFIX=nus-smartstop
 
 # Flask Server Configuration
 FLASK_HOST=0.0.0.0
@@ -225,6 +224,8 @@ MAX_CONTENT_LENGTH=16777216
 MODEL_PATH=./ml_models/
 CONFIDENCE_THRESHOLD=0.5
 ```
+
+**Note**: Update the InfluxDB token directly in `telegraf.conf` file.
 
 ## 📡 API Endpoints
 
@@ -269,22 +270,26 @@ Response: {"filename": "...", "predictions": [...], "confidence": 0.95}
 
 ## 🔌 MQTT Topics
 
+All topics use the `nus-smartstop/` prefix.
+
 ### Sensor Data (Published by ESP32)
 ```
-Topic: smartstop/sensors/{sensor_type}/{device_id}
+Topic: nus-smartstop/sensors/{sensor_type}
 Payload: {
-  "device_id": "esp32_001",
+  "deviceId": "esp32_001",
   "location": "bus_stop_01",
   "distance": 123.45,
   "timestamp": 1234567890
 }
 ```
 
+**Note**: Use `deviceId` (not `device_id`) as this is the tag key configured in Telegraf.
+
 ### Camera Events (Published by ESP32)
 ```
-Topic: smartstop/camera/{device_id}
+Topic: nus-smartstop/camera
 Payload: {
-  "device_id": "esp32_001",
+  "deviceId": "esp32_001",
   "location": "bus_stop_01",
   "event_type": "capture",
   "image_count": 1
@@ -293,7 +298,7 @@ Payload: {
 
 ### Commands (Subscribe on ESP32)
 ```
-Topic: smartstop/command/{device_id}
+Topic: nus-smartstop/command/{device_id}
 Payload: "BEEP" | "CAPTURE" | ...
 ```
 
@@ -334,8 +339,11 @@ curl http://localhost:5000/health
 curl -X POST -F "image=@test_image.jpg" http://localhost:5000/api/upload
 
 # Test MQTT (using mosquitto_pub)
-mosquitto_pub -h localhost -t "smartstop/sensors/test/device1" \
-  -m '{"device_id":"test1","distance":100}'
+mosquitto_pub -h localhost -t "nus-smartstop/sensors/ultrasonic" \
+  -m '{"deviceId":"test1","location":"test","distance":100,"timestamp":1234567890}'
+
+# Check Telegraf is receiving and forwarding data
+docker-compose logs -f telegraf
 
 # Test InfluxDB connection
 python server/influxdb/client.py
