@@ -6,7 +6,7 @@ import os
 import logging
 import sqlite3
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
@@ -128,7 +128,7 @@ def health():
     """Health check endpoint."""
     return jsonify({
         'status': 'healthy',
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         'images_stored': get_images_count(),
         'disk_free_gb': get_disk_free_gb()
     })
@@ -142,7 +142,7 @@ def upload_image():
     - Raw body: expects raw image bytes with Device-ID header or device_id query/form param
     """
     try:
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         device_id = None
         filename = None
         
@@ -196,7 +196,7 @@ def upload_image():
         
         # Save metadata to database
         save_metadata(
-            timestamp=datetime.utcnow().isoformat() + 'Z',
+            timestamp=datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             filename=filename,
             size_bytes=file_size,
             device_id=device_id
@@ -208,7 +208,7 @@ def upload_image():
             'size': file_size,
             'url': f"/api/images/{filename}",
             'metadata': {
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
+                'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
                 'device_id': device_id
             }
         }), 201
@@ -259,7 +259,7 @@ def get_image(filename):
     """Serve image file."""
     try:
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except NotFound:
+    except (NotFound, FileNotFoundError):
         return jsonify({'error': 'Image not found'}), 404
     except Exception as e:
         logger.error(f"Failed to serve image {filename}: {e}")

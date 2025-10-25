@@ -1,4 +1,4 @@
 Flask
 python-dotenv
 flask-cors
-Pillow
+Pillow>=10.2.0
