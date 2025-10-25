@@ -9,10 +9,10 @@ NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
 - **Cameras** for image capture and analysis
 - **Ultrasonic sensors** for distance/occupancy detection
 - **Speakers** for audio notifications
-- **InfluxDB** time-series database for sensor data (external)
+- **InfluxDB** time-series database for sensor data (local)
 - **Telegraf** for MQTT to InfluxDB bridging
 - **MQTT** messaging protocol for real-time communication
-- **Flask** web server for image handling
+- **Flask** web server for image handling with API key authentication
 - **ML models** for image analysis and predictions
 
 ## 📁 Project Structure
@@ -23,19 +23,23 @@ NUS-SmartStop/
 │   └── smartstop_main.ino     # Main ESP32 sketch
 ├── server/
 │   ├── flask/                 # Flask image server
-│   │   └── app.py            # Flask application
+│   │   └── app.py            # Flask application with API auth
 │   ├── influxdb/             # InfluxDB client (optional)
 │   │   └── client.py         # InfluxDB handler
-│   └── mqtt/                 # MQTT broker config
-│       ├── mqtt_client.py    # MQTT debug client (deprecated)
-│       └── mosquitto.conf    # Mosquitto configuration
+│   ├── mqtt/                 # MQTT broker config
+│   │   ├── mqtt_client.py    # MQTT debug client (deprecated)
+│   │   └── mosquitto.conf    # Mosquitto configuration
+│   └── systemd/              # Systemd service files
+│       ├── flask-image-server.service
+│       ├── telegraf.service
+│       └── mosquitto-cs3237.conf
 ├── ml_models/                # ML model inference
 │   └── inference.py          # Inference handler
 ├── docs/                     # Documentation
+│   ├── DEPLOYMENT.md         # Production deployment guide
 │   ├── TELEGRAF.md          # Telegraf setup guide
 │   └── ...
 ├── telegraf.conf             # Telegraf configuration
-├── docker-compose.yml        # Docker services (Mosquitto, Telegraf)
 ├── requirements.txt          # Python dependencies
 ├── .env.example             # Environment variables template
 └── README.md                # This file
@@ -44,17 +48,19 @@ NUS-SmartStop/
 ## 🏗️ Architecture
 
 ```
-ESP32 Devices → MQTT Broker (Mosquitto) → Telegraf → InfluxDB (External)
+ESP32 Devices → MQTT Broker (Mosquitto) → Telegraf → InfluxDB (Local)
                                              ↓
-                                      Flask Server (Images)
+                                      Flask Server (Images + API Auth)
 ```
 
 **Key Components:**
-- **ESP32**: Collects sensor data, captures images
-- **MQTT Broker**: Message routing (Mosquitto)
-- **Telegraf**: Bridges MQTT topics to InfluxDB
-- **InfluxDB**: Time-series storage (managed externally)
-- **Flask**: Image upload/retrieval and ML inference API
+- **ESP32**: Collects sensor data, captures images, sends with API key
+- **MQTT Broker**: Message routing (Mosquitto via systemd)
+- **Telegraf**: Bridges MQTT topics to InfluxDB (via systemd)
+- **InfluxDB**: Time-series storage (local, same server)
+- **Flask**: Image upload/retrieval with X-API-Key authentication
+
+**Deployment**: All services run natively on Ubuntu 24.04 using systemd (no Docker).
 
 ## 🛠️ Hardware Requirements
 
@@ -102,65 +108,41 @@ Camera (ESP32-CAM):
 
 ## 🚀 Quick Start
 
-### 1. Clone the Repository
+### For Development (Local Testing)
+
 ```bash
+# 1. Clone repository
 git clone https://github.com/AY2526S1-CS3237-Team-10/NUS-SmartStop.git
 cd NUS-SmartStop
-```
 
-### 2. Setup InfluxDB (External)
-
-Set up your InfluxDB instance separately (not in Docker). You can:
-- Install InfluxDB locally: https://docs.influxdata.com/influxdb/v2.7/install/
-- Use InfluxDB Cloud: https://www.influxdata.com/products/influxdb-cloud/
-- Use an existing InfluxDB server
-
-Create:
-- Organization: `smartstop`
-- Bucket: `sensor_data`
-- API Token with write permissions
-
-### 3. Server Setup
-
-#### Using Docker (Recommended)
-```bash
-# Configure environment variables
-cp .env.example .env
-# Edit .env with your InfluxDB URL and token
-
-# Start MQTT broker and Telegraf
-docker-compose up -d
-
-# Install Python dependencies (for Flask)
+# 2. Install Python dependencies
 pip install -r requirements.txt
 
-# Start Flask server
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your settings (especially API_KEY)
+
+# 4. Run Flask server locally
 python server/flask/app.py
 ```
 
-**Or use the convenience script:**
+### For Production Deployment (Ubuntu 24.04)
+
+**See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.**
+
+Quick summary:
 ```bash
-./start.sh
+# Install services
+sudo apt install mosquitto telegraf influxdb2 python3-pip
+
+# Deploy files (see DEPLOYMENT.md for details)
+# - Flask app → /root/cs3237_server/image_server.py
+# - Telegraf config → /etc/telegraf/telegraf.conf
+# - Mosquitto config → /etc/mosquitto/conf.d/cs3237.conf
+
+# Start services
+sudo systemctl start mosquitto telegraf influxdb flask-image-server
 ```
-
-#### Manual Setup (without Docker)
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Install Telegraf
-# See docs/TELEGRAF.md for installation instructions
-
-# Install and configure Mosquitto MQTT broker
-# Ubuntu/Debian: sudo apt-get install mosquitto
-# macOS: brew install mosquitto
-
-# Configure environment variables
-cp .env.example .env
-# Edit .env with your InfluxDB and MQTT settings
-
-# Start Telegraf with config
-telegraf --config telegraf.conf
 
 # Start Flask server
 python server/flask/app.py
@@ -187,8 +169,9 @@ python server/flask/app.py
      ```cpp
      const char* ssid = "YOUR_WIFI_SSID";
      const char* password = "YOUR_WIFI_PASSWORD";
-     const char* mqtt_server = "YOUR_MQTT_BROKER_IP";
-     const char* flask_server = "http://YOUR_FLASK_SERVER_IP:5000";
+     const char* mqtt_server = "157.230.250.226";  // Production server
+     const char* flask_server = "http://157.230.250.226:5000";
+     const char* api_key = "CS3237-Group10-SecretKey";  // Match server API key
      ```
 
 4. **Upload to ESP32**:
@@ -202,7 +185,7 @@ python server/flask/app.py
 ### Environment Variables (.env)
 
 ```bash
-# InfluxDB Configuration (External)
+# InfluxDB Configuration (Local)
 INFLUXDB_URL=http://127.0.0.1:8086
 INFLUXDB_TOKEN=your-influxdb-token
 INFLUXDB_ORG=NUS SmartStop
@@ -216,9 +199,12 @@ MQTT_TOPIC_PREFIX=nus-smartstop
 # Flask Server Configuration
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000
-FLASK_DEBUG=True
+FLASK_DEBUG=False
 UPLOAD_FOLDER=./uploads
 MAX_CONTENT_LENGTH=16777216
+
+# Flask API Authentication
+API_KEY=CS3237-Group10-SecretKey
 
 # ML Model Configuration
 MODEL_PATH=./ml_models/
@@ -231,6 +217,8 @@ CONFIDENCE_THRESHOLD=0.5
 
 ### Flask Server
 
+All upload endpoints require `X-API-Key` header for authentication.
+
 #### Health Check
 ```
 GET /health
@@ -239,13 +227,22 @@ Response: {"status": "healthy", "timestamp": "..."}
 
 #### Upload Image
 ```
-POST /api/upload
+POST /upload
+Headers:
+  X-API-Key: CS3237-Group10-SecretKey
 Content-Type: multipart/form-data
 Body: 
   - image: (file)
   - device_id: (optional)
   - location: (optional)
 Response: {"status": "success", "filename": "...", "metadata": {...}}
+
+Example:
+curl -X POST \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
+  -F "image=@test.jpg" \
+  -F "device_id=esp32_001" \
+  http://localhost:5000/upload
 ```
 
 #### Get Image

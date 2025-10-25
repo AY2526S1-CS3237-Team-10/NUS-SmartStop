@@ -23,6 +23,9 @@ const char* mqtt_server = "YOUR_MQTT_BROKER_IP";
 const int mqtt_port = 1883;
 const char* flask_server = "http://YOUR_FLASK_SERVER_IP:5000";
 
+// API Key for Flask authentication
+const char* api_key = "CS3237-Group10-SecretKey";
+
 // Device configuration
 const char* device_id = "esp32_001";
 const char* location = "bus_stop_01";
@@ -217,10 +220,11 @@ void capture_and_upload_image() {
   
   // Upload to Flask server
   HTTPClient http;
-  String upload_url = String(flask_server) + "/api/upload";
+  String upload_url = String(flask_server) + "/upload";
   
   http.begin(upload_url);
   http.addHeader("Content-Type", "multipart/form-data; boundary=SmartStop");
+  http.addHeader("X-API-Key", api_key);  // Add API key authentication
   
   String body = "--SmartStop\r\n";
   body += "Content-Disposition: form-data; name=\"image\"; filename=\"capture.jpg\"\r\n";

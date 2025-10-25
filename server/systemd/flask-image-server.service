@@ -1,0 +1,18 @@
+[Unit]
+Description=Flask Image Server for NUS SmartStop
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/cs3237_server
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="FLASK_APP=image_server.py"
+Environment="UPLOAD_FOLDER=/root/cs3237_server/uploads"
+Environment="API_KEY=CS3237-Group10-SecretKey"
+ExecStart=/usr/bin/python3 /root/cs3237_server/image_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Telegraf Agent for NUS SmartStop
+Documentation=https://github.com/influxdata/telegraf
+After=network.target
+
+[Service]
+Type=simple
+User=telegraf
+ExecStart=/usr/bin/telegraf -config /etc/telegraf/telegraf.conf
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

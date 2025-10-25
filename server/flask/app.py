@@ -25,6 +25,9 @@ app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER', './uploads')
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+# API Key for authentication
+API_KEY = os.getenv('API_KEY', 'CS3237-Group10-SecretKey')
+
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -39,6 +42,12 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def check_api_key():
+    """Check if request has valid API key"""
+    api_key = request.headers.get('X-API-Key')
+    return api_key == API_KEY
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -48,12 +57,18 @@ def health_check():
     })
 
 
-@app.route('/api/upload', methods=['POST'])
+@app.route('/upload', methods=['POST'])
 def upload_image():
     """
     Upload image from ESP32 camera
     Expected: multipart/form-data with 'image' field
+    Requires: X-API-Key header for authentication
     """
+    # Check API key authentication
+    if not check_api_key():
+        logger.warning(f"Unauthorized upload attempt from {request.remote_addr}")
+        return jsonify({'error': 'Unauthorized'}), 401
+    
     try:
         if 'image' not in request.files:
             return jsonify({'error': 'No image file provided'}), 400
