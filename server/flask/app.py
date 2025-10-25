@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import NotFound
 from PIL import Image
 
 # Try to load environment variables from .env file
@@ -22,7 +23,7 @@ except ImportError:
     pass
 
 # Configuration from environment variables
-UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', './uploads')
+UPLOAD_FOLDER = os.path.abspath(os.getenv('UPLOAD_FOLDER', './uploads'))
 MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB default
 FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')
 FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
@@ -258,7 +259,7 @@ def get_image(filename):
     """Serve image file."""
     try:
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except FileNotFoundError:
+    except NotFound:
         return jsonify({'error': 'Image not found'}), 404
     except Exception as e:
         logger.error(f"Failed to serve image {filename}: {e}")
