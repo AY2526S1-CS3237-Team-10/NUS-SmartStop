@@ -73,7 +73,7 @@ def test_mqtt_connection():
             if rc == 0:
                 connected[0] = True
         
-        client = mqtt.Client()
+        client = mqtt.Client(client_id='test_client')
         client.on_connect = on_connect
         
         client.connect(MQTT_BROKER, MQTT_PORT, 10)

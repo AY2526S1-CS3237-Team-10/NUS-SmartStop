@@ -94,7 +94,7 @@ Blue LED ──────> GPIO 16 (D16) + 220Ω resistor
 ## Power Considerations
 
 ### Power Supply Options
-1. **USB Power**: 5V via micro-USB (500mA minimum)
+1. **USB Power**: 5V via micro-USB (500mA minimum) - Note: ESP32 DOIT DevKit V1 uses micro-USB; newer variants may use USB-C
 2. **External Power**: 5V via VIN pin (1A recommended for camera)
 3. **Battery**: 3.7V LiPo with voltage regulator
 
