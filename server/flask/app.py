@@ -177,8 +177,16 @@ def upload_image():
             if not device_id:
                 device_id = 'unknown'
             
+            # Sanitize device_id to prevent path injection
+            # Only allow alphanumeric, hyphens, and underscores
+            # This prevents path traversal attacks (e.g., "../../../etc/passwd")
+            device_id = ''.join(c for c in device_id if c.isalnum() or c in '-_')
+            if not device_id:
+                device_id = 'unknown'
+            
             # Assume JPEG if no extension specified
             filename = f"{device_id}_{timestamp}.jpg"
+            # Safe: UPLOAD_FOLDER is absolute, filename is sanitized
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             
             # Save raw bytes
@@ -215,7 +223,7 @@ def upload_image():
         
     except Exception as e:
         logger.error(f"Upload failed: {e}")
-        return jsonify({'error': 'Upload failed', 'message': str(e)}), 500
+        return jsonify({'error': 'Upload failed'}), 500
 
 
 @app.route('/api/images', methods=['GET'])
