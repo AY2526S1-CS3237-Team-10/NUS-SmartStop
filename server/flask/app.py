@@ -28,6 +28,7 @@ MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 1
 FLASK_HOST = os.getenv('FLASK_HOST', '0.0.0.0')
 FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
 FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+API_KEY = os.getenv('API_KEY', 'default-secret-key')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 DB_PATH = os.path.join(os.path.dirname(__file__), 'metadata.db')
@@ -140,7 +141,13 @@ def upload_image():
     Upload image endpoint supporting both multipart and raw body uploads.
     - Multipart: expects 'image' field in request.files
     - Raw body: expects raw image bytes with Device-ID header or device_id query/form param
+    - Requires X-API-Key header for authentication
     """
+    # Check API key authentication
+    if request.headers.get('X-API-Key') != API_KEY:
+        logger.warning(f"Unauthorized upload attempt from {request.remote_addr}")
+        return jsonify({'error': 'Unauthorized'}), 401
+    
     try:
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         device_id = None
@@ -224,6 +231,15 @@ def upload_image():
     except Exception as e:
         logger.error(f"Upload failed: {e}")
         return jsonify({'error': 'Upload failed'}), 500
+
+
+@app.route('/upload', methods=['POST'])
+def upload_image_legacy():
+    """
+    Legacy upload endpoint for backward compatibility with ESP32-CAM.
+    Redirects to /api/upload with the same request context.
+    """
+    return upload_image()
 
 
 @app.route('/api/images', methods=['GET'])

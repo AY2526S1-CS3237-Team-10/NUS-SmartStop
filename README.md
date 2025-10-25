@@ -43,16 +43,21 @@ Returns server status, image count, and disk space.
 
 ### Upload Image (Multipart)
 ```bash
-curl -F "image=@photo.jpg" http://localhost:5000/api/upload
+curl -F "image=@photo.jpg" \
+     -H "X-API-Key: your-secret-api-key-here" \
+     http://localhost:5000/api/upload
 ```
 
 ### Upload Image (Raw Body - ESP32 Compatible)
 ```bash
 curl -X POST -H "Device-ID: ESP32_001" \
+     -H "X-API-Key: your-secret-api-key-here" \
      -H "Content-Type: image/jpeg" \
      --data-binary "@photo.jpg" \
      http://localhost:5000/api/upload
 ```
+
+**Note:** Both `/api/upload` and `/upload` endpoints are supported for backward compatibility with ESP32-CAM devices.
 
 ### List Images
 ```bash
@@ -82,6 +87,7 @@ Environment variables (see `.env.example`):
 - `FLASK_HOST`: Server host (default: `0.0.0.0`)
 - `FLASK_PORT`: Server port (default: `5000`)
 - `FLASK_DEBUG`: Debug mode (default: `False`)
+- `API_KEY`: API key for upload authentication (default: `default-secret-key`)
 
 ## File Naming Convention
 
@@ -92,6 +98,7 @@ Timestamps use UTC in format: `YYYYMMDD_HHMMSS`
 
 ## Security Features
 
+- **API Key Authentication**: Upload endpoints require `X-API-Key` header
 - Validates uploaded files are actual images using Pillow
 - Sanitizes filenames using `secure_filename()`
 - Enforces allowed file extensions: png, jpg, jpeg, gif
