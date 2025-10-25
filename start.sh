@@ -15,7 +15,7 @@ fi
 
 # Check if Docker is available
 if command -v docker-compose &> /dev/null; then
-    echo "Starting Docker services (InfluxDB, Mosquitto)..."
+    echo "Starting Docker services (Mosquitto, Telegraf)..."
     docker-compose up -d
     
     # Wait for services to be ready
@@ -49,31 +49,24 @@ python server/flask/app.py &
 FLASK_PID=$!
 echo "Flask server started (PID: $FLASK_PID)"
 
-# Wait a moment
-sleep 2
-
-# Start MQTT client in background
-echo "Starting MQTT client..."
-python server/mqtt/mqtt_client.py &
-MQTT_PID=$!
-echo "MQTT client started (PID: $MQTT_PID)"
-
 echo ""
 echo "=================================="
 echo "All services started successfully!"
 echo "=================================="
 echo ""
 echo "Services running:"
-echo "- InfluxDB: http://localhost:8086"
-echo "- Flask API: http://localhost:5000"
 echo "- MQTT Broker: localhost:1883"
+echo "- Telegraf: Bridging MQTT to InfluxDB"
+echo "- Flask API: http://localhost:5000"
+echo ""
+echo "Note: InfluxDB should be running externally"
+echo "Note: Telegraf handles MQTT to InfluxDB bridging"
 echo ""
 echo "Process IDs:"
 echo "- Flask: $FLASK_PID"
-echo "- MQTT Client: $MQTT_PID"
 echo ""
 echo "To stop services, run: ./stop.sh"
-echo "Or press Ctrl+C and use: kill $FLASK_PID $MQTT_PID"
+echo "Or press Ctrl+C and use: kill $FLASK_PID"
 echo ""
 
 # Keep script running

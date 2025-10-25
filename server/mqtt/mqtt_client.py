@@ -1,20 +1,27 @@
 """
-MQTT Client for Smart Bus Stop
-Subscribes to MQTT topics and writes sensor data to InfluxDB
+MQTT Client for Smart Bus Stop (DEPRECATED)
+============================================
+
+NOTE: This custom MQTT client is DEPRECATED. 
+Use Telegraf instead for MQTT to InfluxDB bridging.
+
+Telegraf provides:
+- Native MQTT consumer support
+- Direct InfluxDB v2 output
+- Better performance and reliability
+- Built-in retry and buffering
+
+See telegraf.conf for configuration.
+
+This file is kept for reference or custom processing needs.
 """
 
 import os
 import json
-import sys
 import paho.mqtt.client as mqtt
 from datetime import datetime
 from dotenv import load_dotenv
 import logging
-
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from influxdb.client import InfluxDBHandler
 
 # Load environment variables
 load_dotenv()
@@ -25,7 +32,11 @@ logger = logging.getLogger(__name__)
 
 
 class MQTTHandler:
-    """Handler for MQTT operations"""
+    """
+    DEPRECATED: Use Telegraf for MQTT to InfluxDB bridging.
+    
+    This handler is kept for custom processing or debugging purposes only.
+    """
     
     def __init__(self):
         self.broker = os.getenv('MQTT_BROKER', 'localhost')
@@ -33,15 +44,10 @@ class MQTTHandler:
         self.topic_sensors = os.getenv('MQTT_TOPIC_SENSORS', 'smartstop/sensors')
         self.topic_camera = os.getenv('MQTT_TOPIC_CAMERA', 'smartstop/camera')
         
-        # Initialize InfluxDB handler
-        try:
-            self.influx = InfluxDBHandler()
-        except Exception as e:
-            logger.error(f"Failed to initialize InfluxDB handler: {str(e)}")
-            self.influx = None
+        logger.warning("This MQTT client is DEPRECATED. Use Telegraf instead.")
         
         # Initialize MQTT client
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(client_id='smartstop_debug_client')
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         self.client.on_disconnect = self.on_disconnect
@@ -77,84 +83,16 @@ class MQTTHandler:
             # Parse JSON payload
             try:
                 data = json.loads(payload)
+                logger.info(f"Parsed data: {data}")
             except json.JSONDecodeError:
                 logger.error(f"Invalid JSON payload: {payload}")
                 return
             
-            # Process sensor data
-            if topic.startswith(self.topic_sensors):
-                self.process_sensor_data(topic, data)
+            # Custom processing can be added here
+            # Telegraf handles writing to InfluxDB
             
-            # Process camera data
-            elif topic.startswith(self.topic_camera):
-                self.process_camera_data(topic, data)
-            
-            else:
-                logger.warning(f"Unknown topic: {topic}")
-        
         except Exception as e:
             logger.error(f"Error processing message: {str(e)}")
-    
-    def process_sensor_data(self, topic, data):
-        """Process and store sensor data"""
-        try:
-            # Extract sensor type from topic
-            # Format: smartstop/sensors/{sensor_type}/{device_id}
-            parts = topic.split('/')
-            sensor_type = parts[2] if len(parts) > 2 else 'unknown'
-            device_id = parts[3] if len(parts) > 3 else 'unknown'
-            
-            # Prepare tags and fields
-            tags = {
-                'device_id': data.get('device_id', device_id),
-                'sensor_type': sensor_type,
-                'location': data.get('location', 'unknown')
-            }
-            
-            # Extract fields (all numeric values)
-            fields = {}
-            for key, value in data.items():
-                if key not in ['device_id', 'location', 'timestamp']:
-                    if isinstance(value, (int, float)):
-                        fields[key] = value
-            
-            if fields and self.influx:
-                # Write to InfluxDB
-                self.influx.write_sensor_data(
-                    measurement=sensor_type,
-                    tags=tags,
-                    fields=fields
-                )
-                logger.info(f"Stored {sensor_type} data from {device_id}")
-        
-        except Exception as e:
-            logger.error(f"Error processing sensor data: {str(e)}")
-    
-    def process_camera_data(self, topic, data):
-        """Process camera metadata (images handled by Flask server)"""
-        try:
-            logger.info(f"Camera event: {data}")
-            
-            # Store camera event metadata in InfluxDB
-            if self.influx:
-                tags = {
-                    'device_id': data.get('device_id', 'unknown'),
-                    'location': data.get('location', 'unknown')
-                }
-                
-                fields = {
-                    'event_type': data.get('event_type', 'capture'),
-                    'image_count': data.get('image_count', 1)
-                }
-                
-                self.influx.write_sensor_data(
-                    measurement='camera_event',
-                    tags=tags,
-                    fields=fields
-                )
-        
-        except Exception as e:
-            logger.error(f"Error processing camera data: {str(e)}")
     
     def connect(self):
         """Connect to MQTT broker"""
@@ -177,12 +115,15 @@ class MQTTHandler:
         """Stop MQTT client"""
         self.client.loop_stop()
         self.client.disconnect()
-        if self.influx:
-            self.influx.close()
         logger.info("MQTT handler stopped")
 
 
 if __name__ == '__main__':
+    logger.warning("=" * 70)
+    logger.warning("DEPRECATED: Use Telegraf for MQTT to InfluxDB bridging")
+    logger.warning("This is a debug/monitoring client only")
+    logger.warning("=" * 70)
+    
     handler = MQTTHandler()
     handler.connect()
     handler.start()

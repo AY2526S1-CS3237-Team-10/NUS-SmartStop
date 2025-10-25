@@ -9,7 +9,8 @@ NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
 - **Cameras** for image capture and analysis
 - **Ultrasonic sensors** for distance/occupancy detection
 - **Speakers** for audio notifications
-- **InfluxDB** time-series database for sensor data
+- **InfluxDB** time-series database for sensor data (external)
+- **Telegraf** for MQTT to InfluxDB bridging
 - **MQTT** messaging protocol for real-time communication
 - **Flask** web server for image handling
 - **ML models** for image analysis and predictions
@@ -23,19 +24,37 @@ NUS-SmartStop/
 ├── server/
 │   ├── flask/                 # Flask image server
 │   │   └── app.py            # Flask application
-│   ├── influxdb/             # InfluxDB client
+│   ├── influxdb/             # InfluxDB client (optional)
 │   │   └── client.py         # InfluxDB handler
 │   └── mqtt/                 # MQTT broker config
-│       ├── mqtt_client.py    # MQTT client/subscriber
+│       ├── mqtt_client.py    # MQTT debug client (deprecated)
 │       └── mosquitto.conf    # Mosquitto configuration
 ├── ml_models/                # ML model inference
 │   └── inference.py          # Inference handler
 ├── docs/                     # Documentation
-├── docker-compose.yml        # Docker services configuration
+│   ├── TELEGRAF.md          # Telegraf setup guide
+│   └── ...
+├── telegraf.conf             # Telegraf configuration
+├── docker-compose.yml        # Docker services (Mosquitto, Telegraf)
 ├── requirements.txt          # Python dependencies
 ├── .env.example             # Environment variables template
 └── README.md                # This file
 ```
+
+## 🏗️ Architecture
+
+```
+ESP32 Devices → MQTT Broker (Mosquitto) → Telegraf → InfluxDB (External)
+                                             ↓
+                                      Flask Server (Images)
+```
+
+**Key Components:**
+- **ESP32**: Collects sensor data, captures images
+- **MQTT Broker**: Message routing (Mosquitto)
+- **Telegraf**: Bridges MQTT topics to InfluxDB
+- **InfluxDB**: Time-series storage (managed externally)
+- **Flask**: Image upload/retrieval and ML inference API
 
 ## 🛠️ Hardware Requirements
 
@@ -89,34 +108,48 @@ git clone https://github.com/AY2526S1-CS3237-Team-10/NUS-SmartStop.git
 cd NUS-SmartStop
 ```
 
-### 2. Server Setup
+### 2. Setup InfluxDB (External)
 
-#### Option A: Using Docker (Recommended)
+Set up your InfluxDB instance separately (not in Docker). You can:
+- Install InfluxDB locally: https://docs.influxdata.com/influxdb/v2.7/install/
+- Use InfluxDB Cloud: https://www.influxdata.com/products/influxdb-cloud/
+- Use an existing InfluxDB server
+
+Create:
+- Organization: `smartstop`
+- Bucket: `sensor_data`
+- API Token with write permissions
+
+### 3. Server Setup
+
+#### Using Docker (Recommended)
 ```bash
-# Start InfluxDB and MQTT broker
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your InfluxDB URL and token
+
+# Start MQTT broker and Telegraf
 docker-compose up -d
 
-# Install Python dependencies
+# Install Python dependencies (for Flask)
 pip install -r requirements.txt
-
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env with your configuration
 
 # Start Flask server
 python server/flask/app.py
-
-# In another terminal, start MQTT client
-python server/mqtt/mqtt_client.py
 ```
 
-#### Option B: Manual Setup
+**Or use the convenience script:**
+```bash
+./start.sh
+```
+
+#### Manual Setup (without Docker)
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install and configure InfluxDB 2.x
-# Download from: https://www.influxdata.com/downloads/
+# Install Telegraf
+# See docs/TELEGRAF.md for installation instructions
 
 # Install and configure Mosquitto MQTT broker
 # Ubuntu/Debian: sudo apt-get install mosquitto
@@ -124,14 +157,15 @@ pip install -r requirements.txt
 
 # Configure environment variables
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your InfluxDB and MQTT settings
 
-# Start servers
+# Start Telegraf with config
+telegraf --config telegraf.conf
+
+# Start Flask server
 python server/flask/app.py
-python server/mqtt/mqtt_client.py
 ```
-
-### 3. ESP32 Setup
+### 4. ESP32 Setup
 
 1. **Install Arduino IDE** and ESP32 board support:
    - Open Arduino IDE
