@@ -1,3 +1,7 @@
+# Environment files
+.env
+.env.local
+
 # Python
 __pycache__/
 *.py[cod]
@@ -20,15 +24,11 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environments
 venv/
-env/
 ENV/
+env/
 .venv
-
-# Environment variables
-.env
-.env.local
 
 # Flask
 instance/
@@ -58,7 +58,7 @@ saved_model/
 .DS_Store
 Thumbs.db
 
-# Project specific
+# Project specific - uploads and images
 uploads/
 *.jpg
 *.jpeg
@@ -71,9 +71,10 @@ uploads/
 *.log
 logs/
 
-# Database
+# Database files
 *.db
 *.sqlite
+*.csv
 
 # Docker
 .dockerignore

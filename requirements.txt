@@ -9,7 +9,7 @@ influxdb-client==1.38.0
 paho-mqtt==1.6.1
 
 # Image processing
-Pillow==10.1.0
+Pillow>=10.2.0
 opencv-python==4.8.1.78
 
 # ML/AI dependencies
