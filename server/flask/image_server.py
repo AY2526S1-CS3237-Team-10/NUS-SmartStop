@@ -1,6 +1,7 @@
 """
 Flask Image Server with multipart and raw body upload support.
 Includes gallery UI, metadata persistence, and inference endpoint stub.
+Compatible with existing CS3237 Group 10 endpoints.
 """
 import os
 import logging
@@ -9,7 +10,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, request, jsonify, send_from_directory, render_template_string
+from flask import Flask, request, jsonify, send_file, send_from_directory, render_template_string
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import NotFound
@@ -126,16 +127,18 @@ def get_images_count():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint."""
+    """Health check endpoint"""
+    image_count = len([f for f in os.listdir(UPLOAD_FOLDER) if allowed_file(f)]) if os.path.exists(UPLOAD_FOLDER) else 0
+    
     return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
-        'images_stored': get_images_count(),
+        'status': 'running',
+        'service': 'CS3237 Image Server',
+        'images_stored': image_count,
         'disk_free_gb': get_disk_free_gb()
-    })
+    }), 200
 
 
-@app.route('/api/upload', methods=['POST'])
+@app.route('/upload', methods=['POST'])
 def upload_image():
     """
     Upload image endpoint supporting both multipart and raw body uploads.
@@ -149,11 +152,18 @@ def upload_image():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-        device_id = None
-        filename = None
+        # Get raw image data first (for backward compatibility with existing ESP32 code)
+        image_data = request.get_data()
         
-        # Try multipart upload first
+        # Get device ID from headers (optional)
+        device_id = request.headers.get('Device-ID', 'esp32cam')
+        
+        # Sanitize device_id to prevent path injection
+        device_id = ''.join(c for c in device_id if c.isalnum() or c in '-_')
+        if not device_id:
+            device_id = 'esp32cam'
+        
+        # Check if this is a multipart upload
         if 'image' in request.files:
             file = request.files['image']
             if file.filename == '':
@@ -161,8 +171,9 @@ def upload_image():
             
             if file and allowed_file(file.filename):
                 # Use secure filename with timestamp prefix
+                timestamp = datetime.now(timezone.utc)
                 original_filename = secure_filename(file.filename)
-                filename = f"{timestamp}_{original_filename}"
+                filename = f"{timestamp.strftime('%Y%m%d_%H%M%S')}_{original_filename}"
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 
                 # Save file
@@ -170,36 +181,20 @@ def upload_image():
                 logger.info(f"Multipart upload saved: {filename}")
             else:
                 return jsonify({'error': 'File type not allowed'}), 400
-        else:
-            # Handle raw body upload
-            raw_data = request.get_data()
-            if not raw_data:
-                return jsonify({'error': 'No image data provided'}), 400
-            
-            # Get device_id from header, query param, or form
-            device_id = request.headers.get('Device-ID') or \
-                       request.args.get('device_id') or \
-                       request.form.get('device_id')
-            
-            if not device_id:
-                device_id = 'unknown'
-            
-            # Sanitize device_id to prevent path injection
-            # Only allow alphanumeric, hyphens, and underscores
-            # This prevents path traversal attacks (e.g., "../../../etc/passwd")
-            device_id = ''.join(c for c in device_id if c.isalnum() or c in '-_')
-            if not device_id:
-                device_id = 'unknown'
-            
-            # Assume JPEG if no extension specified
-            filename = f"{device_id}_{timestamp}.jpg"
-            # Safe: UPLOAD_FOLDER is absolute, filename is sanitized
+        
+        elif len(image_data) > 0:
+            # Handle raw body upload (ESP32-CAM format)
+            timestamp = datetime.now(timezone.utc)
+            filename = f"{device_id}_{timestamp.strftime('%Y%m%d_%H%M%S')}.jpg"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             
-            # Save raw bytes
+            # Save image
             with open(filepath, 'wb') as f:
-                f.write(raw_data)
-            logger.info(f"Raw body upload saved: {filename}")
+                f.write(image_data)
+            
+            logger.info(f"Raw body upload saved: {filename} ({len(image_data)} bytes)")
+        else:
+            return jsonify({'error': 'No image data'}), 400
         
         # Validate the saved image
         if not validate_image(filepath):
@@ -211,102 +206,65 @@ def upload_image():
         
         # Save metadata to database
         save_metadata(
-            timestamp=datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            timestamp=timestamp.isoformat(),
             filename=filename,
             size_bytes=file_size,
             device_id=device_id
         )
         
+        print(f"✅ Image saved: {filename} ({file_size} bytes)")
+        
         return jsonify({
-            'status': 'success',
+            'success': True,
             'filename': filename,
             'size': file_size,
-            'url': f"/api/images/{filename}",
-            'metadata': {
-                'timestamp': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
-                'device_id': device_id
-            }
-        }), 201
+            'url': f'/images/{filename}'
+        }), 200
         
     except Exception as e:
         logger.error(f"Upload failed: {e}")
-        return jsonify({'error': 'Upload failed'}), 500
+        print(f"❌ Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
-@app.route('/upload', methods=['POST'])
-def upload_image_legacy():
-    """
-    Legacy upload endpoint for backward compatibility with ESP32-CAM.
-    Redirects to /api/upload with the same request context.
-    """
-    return upload_image()
-
-
-@app.route('/api/images', methods=['GET'])
-def list_images():
-    """List images with pagination."""
-    try:
-        limit = request.args.get('limit', default=50, type=int)
-        offset = request.args.get('offset', default=0, type=int)
-        
-        # Get images from upload folder that match allowed extensions
-        all_files = []
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            if allowed_file(filename):
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                all_files.append({
-                    'filename': filename,
-                    'size': os.path.getsize(filepath),
-                    'url': f"/api/images/{filename}"
-                })
-        
-        # Sort by filename (which includes timestamp) in reverse order
-        all_files.sort(key=lambda x: x['filename'], reverse=True)
-        
-        # Apply pagination
-        paginated_files = all_files[offset:offset + limit]
-        
-        return jsonify({
-            'images': paginated_files,
-            'total': len(all_files),
-            'limit': limit,
-            'offset': offset
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to list images: {e}")
-        return jsonify({'error': 'Failed to list images'}), 500
-
-
-@app.route('/api/images/<filename>', methods=['GET'])
+@app.route('/images/<filename>', methods=['GET'])
 def get_image(filename):
-    """Serve image file."""
+    """Serve image file"""
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except (NotFound, FileNotFoundError):
-        return jsonify({'error': 'Image not found'}), 404
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(filepath):
+            return send_file(filepath, mimetype='image/jpeg')
+        else:
+            return jsonify({'error': 'Image not found'}), 404
     except Exception as e:
         logger.error(f"Failed to serve image {filename}: {e}")
-        return jsonify({'error': 'Failed to serve image'}), 500
+        return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/inference', methods=['POST'])
-def inference():
-    """ML inference endpoint stub."""
+@app.route('/images', methods=['GET'])
+def list_images():
+    """List all images"""
     try:
-        data = request.get_json()
-        if not data or 'filename' not in data:
-            return jsonify({'error': 'Missing filename'}), 400
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            return jsonify({'count': 0, 'images': []}), 200
         
-        filename = data['filename']
+        images = sorted(os.listdir(app.config['UPLOAD_FOLDER']), reverse=True)
+        image_list = []
+        for img in images[:50]:  # Last 50 images
+            if allowed_file(img):
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], img)
+                image_list.append({
+                    'filename': img,
+                    'size': os.path.getsize(filepath),
+                    'url': f'/images/{img}'
+                })
         return jsonify({
-            'message': 'ML inference not yet implemented',
-            'filename': filename
-        })
-        
+            'count': len(images),
+            'images': image_list
+        }), 200
     except Exception as e:
-        logger.error(f"Inference request failed: {e}")
-        return jsonify({'error': 'Inference request failed'}), 500
+        logger.error(f"Failed to list images: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 # Gallery HTML template
@@ -314,7 +272,7 @@ GALLERY_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Image Gallery - NUS SmartStop</title>
+    <title>📸 CS3237 Group 10 - Image Gallery</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -370,7 +328,7 @@ GALLERY_TEMPLATE = '''
     </style>
 </head>
 <body>
-    <h1>NUS SmartStop - Image Gallery</h1>
+    <h1>📸 CS3237 Group 10 - Image Gallery</h1>
     <div class="stats">
         <p>Showing latest {{ images|length }} images (Total: {{ total }})</p>
     </div>
@@ -398,16 +356,19 @@ GALLERY_TEMPLATE = '''
 
 
 @app.route('/', methods=['GET'])
-def gallery():
-    """Display gallery of latest images."""
+def index():
+    """Simple web gallery"""
     try:
-        # Get latest 30 images
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            return render_template_string(GALLERY_TEMPLATE, images=[], total=0)
+        
+        # Get all images
         all_files = []
         for filename in os.listdir(app.config['UPLOAD_FOLDER']):
             if allowed_file(filename):
                 all_files.append({
                     'filename': filename,
-                    'url': f"/api/images/{filename}"
+                    'url': f"/images/{filename}"
                 })
         
         # Sort by filename (timestamp) in reverse order
@@ -429,6 +390,9 @@ if __name__ == '__main__':
     # Initialize database
     init_db()
     
+    print("🚀 Starting CS3237 Image Server...")
+    print(f"📁 Images saved to: {UPLOAD_FOLDER}")
+    print(f"📊 Metadata logged to: {DB_PATH}")
     logger.info(f"Starting Flask server on {FLASK_HOST}:{FLASK_PORT}")
     logger.info(f"Upload folder: {UPLOAD_FOLDER}")
     logger.info(f"Max content length: {MAX_CONTENT_LENGTH} bytes")

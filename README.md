@@ -9,7 +9,7 @@ Flask-based image server for IoT devices with gallery UI and metadata persistenc
 - **Gallery UI**: Web interface showing latest uploaded images
 - **Metadata Persistence**: SQLite database for tracking uploads
 - **CORS Enabled**: Cross-origin requests supported
-- **ML Inference Endpoint**: Stub endpoint for future ML integration
+- **API Key Authentication**: Upload endpoints require `X-API-Key` header
 - **Environment Configuration**: Flexible configuration via environment variables
 
 ## Quick Start
@@ -27,7 +27,7 @@ Flask-based image server for IoT devices with gallery UI and metadata persistenc
 
 3. **Run the server**:
    ```bash
-   python server/flask/app.py
+   python server/flask/image_server.py
    ```
 
 4. **Access the gallery**:
@@ -41,42 +41,33 @@ GET /health
 ```
 Returns server status, image count, and disk space.
 
-### Upload Image (Multipart)
-```bash
-curl -F "image=@photo.jpg" \
-     -H "X-API-Key: your-secret-api-key-here" \
-     http://localhost:5000/api/upload
-```
-
 ### Upload Image (Raw Body - ESP32 Compatible)
 ```bash
 curl -X POST -H "Device-ID: ESP32_001" \
      -H "X-API-Key: your-secret-api-key-here" \
      -H "Content-Type: image/jpeg" \
      --data-binary "@photo.jpg" \
-     http://localhost:5000/api/upload
+     http://localhost:5000/upload
 ```
 
-**Note:** Both `/api/upload` and `/upload` endpoints are supported for backward compatibility with ESP32-CAM devices.
+### Upload Image (Multipart)
+```bash
+curl -F "image=@photo.jpg" \
+     -H "X-API-Key: your-secret-api-key-here" \
+     http://localhost:5000/upload
+```
 
 ### List Images
 ```bash
-GET /api/images?limit=50&offset=0
+GET /images
 ```
-Supports pagination with `limit` and `offset` query parameters.
+Returns list of all images with metadata.
 
 ### Get Image
 ```bash
-GET /api/images/<filename>
+GET /images/<filename>
 ```
-
-### ML Inference (Stub)
-```bash
-POST /api/inference
-Content-Type: application/json
-
-{"filename": "image.jpg"}
-```
+Serves the image file.
 
 ## Configuration
 
