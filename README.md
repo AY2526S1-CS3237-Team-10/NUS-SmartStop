@@ -1,113 +1,585 @@
 # NUS-SmartStop
 
-Flask-based image server for IoT devices with gallery UI and metadata persistence.
+A comprehensive IoT solution for smart bus stops using ESP32, featuring real-time sensor monitoring, image capture and analysis, and ML-powered insights.
 
-## Features
+## 🚀 Project Overview
 
-- **Dual Upload Support**: Accepts both multipart/form-data and raw body uploads (ESP32 compatible)
-- **Secure File Handling**: Uses secure filenames, UTC timestamps, and validates image files
-- **Gallery UI**: Web interface showing latest uploaded images
-- **Metadata Persistence**: SQLite database for tracking uploads
-- **CORS Enabled**: Cross-origin requests supported
-- **API Key Authentication**: Upload endpoints require `X-API-Key` header
-- **Environment Configuration**: Flexible configuration via environment variables
+NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
+- **ESP32 DOIT DevKit V1** microcontroller with cameras and sensors
+- **ESP32-CAM** for image capture with API key authentication
+- **Ultrasonic sensors** for distance/occupancy detection
+- **Speakers** for audio notifications
+- **MQTT** messaging protocol (Mosquitto) for real-time communication
+- **Telegraf** for MQTT to InfluxDB data bridging
+- **InfluxDB** time-series database for sensor data (local)
+- **Flask** web server with dual upload modes and API key authentication
+- **ML models** for image analysis and predictions
 
-## Quick Start
+## 📁 Project Structure
 
-1. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```
+NUS-SmartStop/
+├── esp32/                      # ESP32 firmware code
+│   └── smartstop_main.ino     # Main ESP32 sketch with API auth
+├── server/
+│   ├── flask/                 # Flask image server
+│   │   ├── image_server.py   # Flask application with dual upload modes
+│   │   ├── requirements.txt  # Python dependencies
+│   │   └── .env.example      # Configuration template
+│   ├── influxdb/             # InfluxDB setup scripts
+│   │   └── setup.sh          # InfluxDB initialization
+│   ├── mqtt/                 # MQTT configuration
+│   │   └── mqtt_client.py    # MQTT debug client (optional)
+│   └── systemd/              # Systemd service files
+│       ├── flask-image-server.service
+│       ├── telegraf.service
+│       └── mosquitto-cs3237.conf
+├── ml_models/                # ML model inference
+│   └── inference.py          # Inference handler
+├── docs/                     # Documentation
+│   ├── DEPLOYMENT.md         # Production deployment guide
+│   ├── TELEGRAF.md          # Telegraf setup guide
+│   ├── ARCHITECTURE.md      # System architecture
+│   └── API.md               # API reference
+├── telegraf.conf             # Telegraf MQTT→InfluxDB bridge config
+├── requirements.txt          # Python dependencies
+├── .env.example             # Environment variables template
+└── README.md                # This file
+```
 
-2. **Configure environment** (optional):
-   ```bash
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
+## 🏗️ Architecture
 
-3. **Run the server**:
-   ```bash
-   python server/flask/image_server.py
-   ```
+```
+ESP32-CAM → HTTP POST (with API key) → Flask Server → Image Storage
+                                          ↓
+                                     SQLite Metadata
 
-4. **Access the gallery**:
-   Open http://localhost:5000 in your browser
+ESP32 Sensors → MQTT → Mosquitto → Telegraf → InfluxDB (Local)
+                                         ↓
+                                   Time-series Data
+```
 
-## API Endpoints
+**Key Components:**
+- **ESP32-CAM**: Captures images, uploads via HTTP with X-API-Key authentication
+- **ESP32 Sensors**: Collects sensor data, publishes to MQTT
+- **MQTT Broker (Mosquitto)**: Message routing via systemd
+- **Telegraf**: Bridges MQTT topics to InfluxDB (via systemd)
+- **InfluxDB**: Time-series storage (local, same server at 127.0.0.1:8086)
+- **Flask**: Dual-mode image server (multipart + raw body) with API authentication and gallery UI
 
-### Health Check
+**Deployment**: All services run natively on Ubuntu 24.04 using systemd (no Docker).  
+**Production Server**: 157.230.250.226 (DigitalOcean, 512MB RAM)
+
+## 🛠️ Hardware Requirements
+
+### ESP32 DOIT DevKit V1
+- **Microcontroller**: ESP32-WROOM-32
+- **Flash**: 4MB
+- **RAM**: 520KB
+- **WiFi**: 802.11 b/g/n
+- **Bluetooth**: v4.2 BR/EDR and BLE
+
+### Sensors and Peripherals
+- **Camera Module**: ESP32-CAM (AI-Thinker) with OV2640
+- **Ultrasonic Sensor**: HC-SR04 or similar
+- **Speaker/Buzzer**: For audio notifications
+- **Power Supply**: 5V USB or external power adapter
+
+### Pin Configuration (Default)
+```
+Ultrasonic Sensor:
+- TRIG_PIN: GPIO 12
+- ECHO_PIN: GPIO 14
+
+Speaker:
+- SPEAKER_PIN: GPIO 13
+
+Camera (ESP32-CAM):
+- See esp32/smartstop_main.ino for detailed pin mapping
+```
+
+## 📦 Software Requirements
+
+### For Server (Ubuntu 24.04)
+- Python 3.8+
+- Mosquitto MQTT broker
+- Telegraf
+- InfluxDB 2.x
+- systemd (for service management)
+
+### For ESP32
+- Arduino IDE 1.8+ or PlatformIO
+- ESP32 Board Support Package
+- Required Libraries:
+  - WiFi.h
+  - PubSubClient
+  - HTTPClient
+  - esp_camera.h (for ESP32-CAM)
+
+## 🚀 Quick Start
+
+### For Development (Local Testing)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/AY2526S1-CS3237-Team-10/NUS-SmartStop.git
+cd NUS-SmartStop
+
+# 2. Install Python dependencies
+pip install -r server/flask/requirements.txt
+
+# 3. Configure environment
+cp server/flask/.env.example server/flask/.env
+# Edit .env with your settings (especially API_KEY)
+
+# 4. Run Flask server locally
+python server/flask/image_server.py
+
+# 5. Access gallery
+# Open http://localhost:5000 in your browser
+```
+
+### For Production Deployment (Ubuntu 24.04)
+
+**See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.**
+
+Quick summary:
+```bash
+# 1. Install services
+sudo apt install mosquitto telegraf influxdb2 python3-pip
+
+# 2. Setup InfluxDB
+influx setup --org "NUS SmartStop" --bucket sensor_data
+
+# 3. Deploy files (see DEPLOYMENT.md for details)
+sudo cp server/flask/image_server.py /root/cs3237_server/image_server.py
+sudo cp telegraf.conf /etc/telegraf/telegraf.conf
+sudo cp server/systemd/mosquitto-cs3237.conf /etc/mosquitto/conf.d/cs3237.conf
+
+# 4. Configure environment
+cat > /root/cs3237_server/.env << 'EOF'
+API_KEY=CS3237-Group10-SecretKey
+UPLOAD_FOLDER=/root/cs3237_server/images
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+EOF
+
+# 5. Start services
+sudo systemctl start mosquitto telegraf influxdb flask-image-server
+```
+
+### ESP32 Setup
+
+1. **Install Arduino IDE** and ESP32 board support:
+   - Open Arduino IDE
+   - Go to File > Preferences
+   - Add to Additional Board Manager URLs:
+     ```
+     https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+     ```
+   - Go to Tools > Board > Board Manager
+   - Search for "esp32" and install
+
+2. **Install Required Libraries**:
+   - Tools > Manage Libraries
+   - Install: PubSubClient, ArduinoJson, HTTPClient
+
+3. **Configure WiFi and Server Details**:
+   - Open `esp32/smartstop_main.ino`
+   - Update:
+     ```cpp
+     const char* ssid = "YOUR_WIFI_SSID";
+     const char* password = "YOUR_WIFI_PASSWORD";
+     const char* mqtt_server = "157.230.250.226";  // Production server
+     const char* flask_server = "http://157.230.250.226:5000";
+     const char* api_key = "CS3237-Group10-SecretKey";  // Must match server!
+     ```
+
+4. **Upload to ESP32**:
+   - Connect ESP32 via USB
+   - Select Board: Tools > Board > ESP32 Dev Module
+   - Select Port: Tools > Port > (your port)
+   - Click Upload
+
+## 🔧 Configuration
+
+### Environment Variables (.env)
+
+```bash
+# Flask Server Configuration
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+FLASK_DEBUG=False
+UPLOAD_FOLDER=/root/cs3237_server/images
+MAX_CONTENT_LENGTH=16777216  # 16MB max upload
+
+# Flask API Authentication (REQUIRED!)
+API_KEY=CS3237-Group10-SecretKey
+
+# InfluxDB Configuration (Local)
+INFLUXDB_URL=http://127.0.0.1:8086
+INFLUXDB_TOKEN=your-influxdb-token  # Set in telegraf.conf
+INFLUXDB_ORG=NUS SmartStop
+INFLUXDB_BUCKET=sensor_data
+
+# MQTT Configuration
+MQTT_BROKER=127.0.0.1
+MQTT_PORT=1883
+MQTT_TOPIC_PREFIX=nus-smartstop
+
+# ML Model Configuration
+MODEL_PATH=./ml_models/
+CONFIDENCE_THRESHOLD=0.5
+```
+
+**Important**: The API key in `.env` must match the key in your ESP32-CAM code!
+
+## 📡 API Endpoints
+
+### Flask Image Server
+
+**All upload endpoints require `X-API-Key` header for authentication.**
+
+#### Health Check
 ```bash
 GET /health
-```
-Returns server status, image count, and disk space.
 
-### Upload Image (Raw Body - ESP32 Compatible)
+Response:
+{
+  "status": "running",
+  "timestamp": "2025-10-26T17:21:29Z",
+  "images_stored": 42,
+  "disk_free_gb": 8.5
+}
+
+Example:
+curl http://157.230.250.226:5000/health
+```
+
+#### Upload Image (Raw Body - ESP32-CAM Compatible)
 ```bash
-curl -X POST -H "Device-ID: ESP32_001" \
-     -H "X-API-Key: your-secret-api-key-here" \
-     -H "Content-Type: image/jpeg" \
-     --data-binary "@photo.jpg" \
-     http://localhost:5000/upload
+POST /upload
+Headers:
+  X-API-Key: CS3237-Group10-SecretKey
+  Device-ID: ESP32_001
+  Content-Type: image/jpeg
+Body: (raw image bytes)
+
+Response:
+{
+  "success": true,
+  "filename": "ESP32_001_20251026_172129.jpg",
+  "size": 82540,
+  "url": "/images/ESP32_001_20251026_172129.jpg"
+}
+
+Example:
+curl -X POST \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
+  -H "Device-ID: ESP32_001" \
+  -H "Content-Type: image/jpeg" \
+  --data-binary "@photo.jpg" \
+  http://157.230.250.226:5000/upload
 ```
 
-### Upload Image (Multipart)
+#### Upload Image (Multipart - Web/Mobile Compatible)
 ```bash
-curl -F "image=@photo.jpg" \
-     -H "X-API-Key: your-secret-api-key-here" \
-     http://localhost:5000/upload
+POST /upload
+Headers:
+  X-API-Key: CS3237-Group10-SecretKey
+Content-Type: multipart/form-data
+Body:
+  - image: (file)
+  - device_id: (optional)
+
+Response: (same as raw body)
+
+Example:
+curl -X POST \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
+  -F "image=@photo.jpg" \
+  -F "device_id=esp32_001" \
+  http://157.230.250.226:5000/upload
 ```
 
-### List Images
+#### List Images
 ```bash
-GET /images
-```
-Returns list of all images with metadata.
+GET /images?limit=50&offset=0
 
-### Get Image
+Response:
+{
+  "count": 100,
+  "limit": 50,
+  "offset": 0,
+  "images": [
+    {
+      "filename": "ESP32_001_20251026_172129.jpg",
+      "size": 82540,
+      "url": "/images/ESP32_001_20251026_172129.jpg",
+      "timestamp": "2025-10-26T17:21:29Z"
+    },
+    ...
+  ]
+}
+
+Example:
+curl http://157.230.250.226:5000/images
+```
+
+#### Get Image
 ```bash
 GET /images/<filename>
+
+Response: Image file (JPEG)
+
+Example:
+curl http://157.230.250.226:5000/images/ESP32_001_20251026_172129.jpg
 ```
-Serves the image file.
 
-## Configuration
+#### Web Gallery
+```bash
+GET /
 
-Environment variables (see `.env.example`):
+Response: HTML gallery interface
 
-- `UPLOAD_FOLDER`: Directory for uploaded images (default: `./uploads`)
-- `MAX_CONTENT_LENGTH`: Maximum upload size in bytes (default: 16777216 = 16MB)
-- `FLASK_HOST`: Server host (default: `0.0.0.0`)
-- `FLASK_PORT`: Server port (default: `5000`)
-- `FLASK_DEBUG`: Debug mode (default: `False`)
-- `API_KEY`: API key for upload authentication (default: `default-secret-key`)
+Access in browser:
+http://157.230.250.226:5000/
+```
 
-## File Naming Convention
+## 🔌 MQTT Topics
 
-- **Multipart uploads**: `{timestamp}_{secure_filename}`
-- **Raw body uploads**: `{device_id}_{timestamp}.jpg`
+All topics use the `nus-smartstop/` prefix.
 
-Timestamps use UTC in format: `YYYYMMDD_HHMMSS`
+### Sensor Data (Published by ESP32)
+```
+Topic: nus-smartstop/sensors/{sensor_type}
+Payload: {
+  "deviceId": "esp32_001",
+  "location": "bus_stop_01",
+  "distance": 123.45,
+  "timestamp": 1698765432
+}
+```
 
-## Security Features
+**Important**: Use `deviceId` (not `device_id`) as this is the tag key configured in Telegraf.
 
-- **API Key Authentication**: Upload endpoints require `X-API-Key` header
-- Validates uploaded files are actual images using Pillow
-- Sanitizes filenames using `secure_filename()`
-- Enforces allowed file extensions: png, jpg, jpeg, gif
-- Content-length limits configurable via `MAX_CONTENT_LENGTH`
-- CORS enabled for cross-origin access
+### Camera Events (Published by ESP32)
+```
+Topic: nus-smartstop/camera
+Payload: {
+  "deviceId": "esp32_001",
+  "location": "bus_stop_01",
+  "event_type": "capture",
+  "image_count": 1
+}
+```
 
-## Database
+### Commands (Subscribe on ESP32)
+```
+Topic: nus-smartstop/command/{device_id}
+Payload: "BEEP" | "CAPTURE" | ...
+```
 
+## 🤖 ML Models
+
+The project supports integration with various ML models for image analysis:
+
+### Supported Use Cases
+1. **Object Detection**: Detect buses, people, vehicles
+2. **Crowd Analysis**: Estimate number of people waiting
+3. **Scene Classification**: Classify bus stop conditions
+4. **Anomaly Detection**: Detect unusual activities
+
+### Adding Custom Models
+
+1. Place your trained model in `ml_models/` directory
+2. Update `ml_models/inference.py` to load your model:
+   ```python
+   handler = MLInferenceHandler()
+   handler.load_model('your_model.pth')
+   ```
+3. Implement custom inference logic as needed
+
+## 📊 Data Visualization
+
+InfluxDB data can be visualized using:
+- **InfluxDB UI**: Built-in at http://127.0.0.1:8086 (SSH tunnel to access)
+- **Grafana**: Connect to InfluxDB datasource
+- **Custom dashboards**: Query via InfluxDB API and Flux
+
+## 🧪 Testing
+
+```bash
+# Test Flask server health
+curl http://157.230.250.226:5000/health
+
+# Test image upload with API key (should work)
+curl -X POST \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
+  -H "Device-ID: test_device" \
+  --data-binary "@test.jpg" \
+  http://157.230.250.226:5000/upload
+
+# Test without API key (should fail with 401)
+curl -X POST \
+  --data-binary "@test.jpg" \
+  http://157.230.250.226:5000/upload
+
+# Test MQTT (using mosquitto_pub)
+mosquitto_pub -h 157.230.250.226 \
+  -t "nus-smartstop/sensors/ultrasonic" \
+  -m '{"deviceId":"test1","location":"test","distance":100,"timestamp":1698765432}'
+
+# Subscribe to all topics
+mosquitto_sub -h 157.230.250.226 -t "nus-smartstop/#" -v
+
+# Check Telegraf logs
+sudo journalctl -u telegraf -f
+
+# Check Flask logs
+sudo journalctl -u flask-image-server -f
+
+# Query InfluxDB
+influx query 'from(bucket: "sensor_data") |> range(start: -1h) |> limit(n: 10)'
+```
+
+## 🔒 Security Features
+
+### Flask Image Server
+- **API Key Authentication**: All uploads require `X-API-Key` header
+- **Image Validation**: Validates uploaded files are actual images using Pillow
+- **Secure Filenames**: Sanitizes filenames using `secure_filename()`
+- **Device ID Sanitization**: Prevents injection attacks
+- **Allowed Extensions**: Only png, jpg, jpeg, gif
+- **Content-Length Limits**: 16MB max (configurable)
+- **CORS Enabled**: For web dashboard access
+
+### Infrastructure
+- InfluxDB runs locally (127.0.0.1:8086), not exposed externally
+- MQTT can be configured with authentication (see mosquitto.conf)
+- Systemd services run with appropriate permissions
+- Environment variables for secrets management
+
+### Production Recommendations
+- Change default API keys
+- Enable MQTT authentication in production
+- Use HTTPS with nginx reverse proxy
+- Implement rate limiting for upload endpoints
+- Regular security updates
+
+## 📊 Database
+
+### SQLite (Flask Metadata)
 Uses SQLite (`server/flask/metadata.db`) to store:
-- Upload timestamp
+- Upload timestamp (UTC)
 - Filename
 - File size in bytes
-- Device ID (if provided)
+- Device ID
+- Auto-incrementing ID
 
-## Gallery
+Schema:
+```sql
+CREATE TABLE uploads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    device_id TEXT NOT NULL
+);
+```
 
-The root endpoint (`/`) displays a responsive gallery of the latest 30 images with:
-- Grid layout
-- Image thumbnails
-- Filename display
+### InfluxDB (Sensor Time-Series Data)
+Stores sensor readings with:
+- Measurements: ultrasonic, temperature, humidity, etc.
+- Tags: deviceId, location, sensor_type
+- Fields: distance, value, etc.
+- Timestamps: Nanosecond precision
+
+## 🖼️ Gallery UI
+
+The root endpoint (`/`) displays a responsive web gallery:
+- 📸 Latest 30 images
+- Grid layout with thumbnails
 - Click to view full image
+- Shows filename and metadata
+- Responsive design for mobile/desktop
+
+## 🐛 Troubleshooting
+
+### ESP32-CAM Upload Fails with 401 Unauthorized
+- **Cause**: Missing or incorrect API key
+- **Solution**: Verify `X-API-Key` header matches server's `.env` API_KEY
+
+### ESP32 Connection Issues
+- Verify WiFi credentials
+- Check server IP addresses (157.230.250.226)
+- Ensure Flask/MQTT broker is running
+- Check firewall: `sudo ufw status`
+
+### Camera Issues
+- Verify pin configuration matches your camera module
+- Check power supply (camera requires stable 5V)
+- Reduce image quality if memory issues occur
+
+### MQTT Connection Failed
+- Verify broker is running: `sudo systemctl status mosquitto`
+- Check broker logs: `sudo journalctl -u mosquitto -f`
+- Test with mosquitto_sub: `mosquitto_sub -h localhost -t "#"`
+
+### InfluxDB Connection Failed
+- Verify InfluxDB is running: `sudo systemctl status influxdb`
+- Check token in telegraf.conf
+- Access InfluxDB UI: http://127.0.0.1:8086 (via SSH tunnel)
+
+### Telegraf Not Writing Data
+- Check Telegraf logs: `sudo journalctl -u telegraf -f`
+- Verify MQTT messages are published: `mosquitto_sub -h localhost -t "#" -v`
+- Test telegraf config: `telegraf --config /etc/telegraf/telegraf.conf --test`
+
+## 📚 Documentation
+
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Complete production deployment guide with systemd
+- **[TELEGRAF.md](docs/TELEGRAF.md)** - Telegraf setup and troubleshooting
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and data flows
+- **[API.md](docs/API.md)** - Complete API reference with authentication
+- **[HARDWARE.md](docs/HARDWARE.md)** - Hardware setup and wiring diagrams
+
+## 📚 Additional Resources
+
+- [ESP32 Documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)
+- [InfluxDB Documentation](https://docs.influxdata.com/influxdb/v2.7/)
+- [Telegraf Documentation](https://docs.influxdata.com/telegraf/)
+- [MQTT Protocol](https://mqtt.org/)
+- [Flask Documentation](https://flask.palletsprojects.com/)
+- [Mosquitto MQTT Broker](https://mosquitto.org/)
+
+## 👥 Team
+
+**CS3237 Team 10 - AY2526S1**  
+National University of Singapore  
+School of Computing
+
+## 📄 License
+
+This project is for educational purposes as part of CS3237 coursework.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
+
+## 📞 Support
+
+For issues and questions:
+- Open an issue on GitHub
+- Check documentation in `docs/` folder
+- Review troubleshooting section above
+
+---
+
+**Note**: This is an educational project for CS3237 (Introduction to Internet of Things). Always follow safety guidelines when working with electronics and IoT devices.
+
+**Production Server**: 157.230.250.226 (DigitalOcean, Ubuntu 24.04, 512MB RAM)

@@ -1,5 +1,6 @@
 # Environment files
 .env
+.env.local
 
 # Python
 __pycache__/
@@ -27,6 +28,24 @@ wheels/
 venv/
 ENV/
 env/
+.venv
+
+# Flask
+instance/
+.webassets-cache
+
+# PyTorch
+*.pth
+*.pt
+*.onnx
+
+# TensorFlow
+*.h5
+*.pb
+saved_model/
+
+# Jupyter Notebook
+.ipynb_checkpoints
 
 # IDEs
 .vscode/
@@ -35,11 +54,32 @@ env/
 *.swo
 *~
 
-# Uploads and databases
-uploads/
-*.db
-*.csv
-
 # OS
 .DS_Store
 Thumbs.db
+
+# Project specific - uploads and images
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+!docs/*.png
+!docs/*.jpg
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.csv
+
+# Docker
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp

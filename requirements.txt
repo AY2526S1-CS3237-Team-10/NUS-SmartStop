@@ -1,4 +1,23 @@
-Flask
-python-dotenv
-flask-cors
+# Flask server dependencies
+Flask==3.0.0
+flask-cors==4.0.0
+
+# InfluxDB dependencies
+influxdb-client==1.38.0
+
+# MQTT dependencies
+paho-mqtt==1.6.1
+
+# Image processing
 Pillow>=10.2.0
+opencv-python==4.8.1.78
+
+# ML/AI dependencies
+numpy==1.26.2
+torch==2.1.1
+torchvision==0.16.1
+tensorflow==2.15.0
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
