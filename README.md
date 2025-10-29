@@ -21,9 +21,14 @@ NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
 NUS-SmartStop/
 ├── esp32/                      # ESP32 firmware code
 │   └── smartstop_main.ino     # Main ESP32 sketch with API auth
+├── esp32_cam/                      # ESP32 firmware code
+|   ├── camera_pins.h          # Header Pins for ESP32CAM
+│   └── CameraPhotoCapture.ino     # Main ESP32CAM sketch with Flask server image publishing
 ├── server/
 │   ├── flask/                 # Flask image server
 │   │   ├── image_server.py   # Flask application with dual upload modes
+│   │   ├── esp32cam_image_server.py   # Flask application with auto image processing with run_analysis.py
+│   │   ├── run_analysis.py   # Base Code for .jpg file image comparision and analysis, to upload to DB
 │   │   ├── requirements.txt  # Python dependencies
 │   │   └── .env.example      # Configuration template
 │   ├── influxdb/             # InfluxDB setup scripts
