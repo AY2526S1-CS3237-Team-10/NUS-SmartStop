@@ -32,7 +32,7 @@
 ## File Sizes
 
 ```
-integrated_sensors.ino:         ~627 lines (19 KB)
+integrated_sensors.ino:         ~741 lines (23 KB)
 cs3237speaker.ino:              ~69 lines (1.6 KB)
 cs3237_mic.ino:                 ~239 lines (6.8 KB)
 esp32_ir_people_counter.ino:    ~122 lines (2.9 KB)

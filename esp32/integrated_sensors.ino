@@ -120,6 +120,12 @@ int lastIrA = HIGH, lastIrB = HIGH;
 unsigned long lastTriggerTime = 0;
 const unsigned long sequenceWindow = 1000;
 
+// IR sensor state machine for non-blocking detection
+enum IrState { IR_IDLE, IR_WAIT_A_FOR_B, IR_WAIT_B_FOR_A };
+IrState irState = IR_IDLE;
+unsigned long irStateStartTime = 0;
+const unsigned long IR_DEBOUNCE_DELAY = 500;
+
 // ==================== Ultrasonic Sensor Configuration ====================
 const int SENSOR_COUNT = 3;
 const int trigPins[SENSOR_COUNT] = {2, 16, 12};   // Changed pins
@@ -300,11 +306,22 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.println(message);
   
   // Handle commands
-  if (message == "PLAY_AUDIO_1") audioSelect = 1;
-  else if (message == "PLAY_AUDIO_2") audioSelect = 2;
-  else if (message == "PLAY_AUDIO_3") audioSelect = 3;
-  else if (message == "PLAY_AUDIO_4") audioSelect = 4;
-  else if (message == "RESET_COUNT") peopleCount = 0;
+  if (message == "PLAY_AUDIO_1") {
+    audioSelect = 1;
+    playAudio(audioSelect);
+  } else if (message == "PLAY_AUDIO_2") {
+    audioSelect = 2;
+    playAudio(audioSelect);
+  } else if (message == "PLAY_AUDIO_3") {
+    audioSelect = 3;
+    playAudio(audioSelect);
+  } else if (message == "PLAY_AUDIO_4") {
+    audioSelect = 4;
+    playAudio(audioSelect);
+  } else if (message == "RESET_COUNT") {
+    peopleCount = 0;
+    Serial.println("People count reset to 0");
+  }
 }
 
 void printNetStatus() {
@@ -571,33 +588,61 @@ void loopIRSensors() {
   int currB = digitalRead(IR_RX_B);
   unsigned long now = millis();
   
-  // Entry detection (A then B)
-  if (lastIrA == HIGH && currA == LOW) {
-    lastTriggerTime = now;
-    while (millis() - lastTriggerTime < sequenceWindow) {
+  // Non-blocking state machine for IR sensor detection
+  switch (irState) {
+    case IR_IDLE:
+      // Entry detection: A triggered (person approaching from A side)
+      if (lastIrA == HIGH && currA == LOW) {
+        irState = IR_WAIT_A_FOR_B;
+        irStateStartTime = now;
+      }
+      // Exit detection: B triggered (person approaching from B side)
+      else if (lastIrB == HIGH && currB == LOW) {
+        irState = IR_WAIT_B_FOR_A;
+        irStateStartTime = now;
+      }
+      break;
+      
+    case IR_WAIT_A_FOR_B:
+      // Waiting for B to trigger after A (entry sequence)
       if (digitalRead(IR_RX_B) == LOW) {
+        // Entry detected
         peopleCount++;
         Serial.printf("IR: Person entered. Count: %.0f\n", peopleCount);
         publishIRData();
-        delay(500);
-        break;
+        irState = IR_IDLE;
+        // Small delay to prevent immediate re-triggering (non-blocking via state timing)
+        irStateStartTime = now;
+      } else if (now - irStateStartTime > sequenceWindow) {
+        // Timeout - no B trigger, reset to idle
+        irState = IR_IDLE;
       }
-    }
-  }
-  
-  // Exit detection (B then A)
-  if (lastIrB == HIGH && currB == LOW) {
-    lastTriggerTime = now;
-    while (millis() - lastTriggerTime < sequenceWindow) {
+      break;
+      
+    case IR_WAIT_B_FOR_A:
+      // Waiting for A to trigger after B (exit sequence)
       if (digitalRead(IR_RX_A) == LOW) {
+        // Exit detected
         peopleCount--;
         if (peopleCount < 0) peopleCount = 0;
         Serial.printf("IR: Person exited. Count: %.0f\n", peopleCount);
         publishIRData();
-        delay(500);
-        break;
+        irState = IR_IDLE;
+        // Small delay to prevent immediate re-triggering (non-blocking via state timing)
+        irStateStartTime = now;
+      } else if (now - irStateStartTime > sequenceWindow) {
+        // Timeout - no A trigger, reset to idle
+        irState = IR_IDLE;
       }
-    }
+      break;
+  }
+  
+  // Debounce: prevent re-triggering too quickly after detection
+  if (irState == IR_IDLE && now - irStateStartTime < IR_DEBOUNCE_DELAY) {
+    // Still in debounce period, don't start new detection
+    lastIrA = currA;
+    lastIrB = currB;
+    return;
   }
   
   lastIrA = currA;
