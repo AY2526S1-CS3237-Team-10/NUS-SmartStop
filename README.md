@@ -19,11 +19,19 @@ NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
 
 ```
 NUS-SmartStop/
-├── esp32/                      # ESP32 firmware code
-│   └── smartstop_main.ino     # Main ESP32 sketch with API auth
-├── esp32_cam/                      # ESP32 firmware code
-|   ├── camera_pins.h          # Header Pins for ESP32CAM
-│   └── CameraPhotoCapture.ino     # Main ESP32CAM sketch with Flask server image publishing
+├── esp32/                           # ESP32 firmware code
+│   ├── integrated_sensors.ino      # **NEW** Integrated sketch (speaker, mic, IR, ultrasonic)
+│   ├── INTEGRATED_SENSORS_README.md # Documentation for integrated sensors
+│   ├── PIN_MIGRATION_GUIDE.md      # Pin migration guide from individual sketches
+│   ├── pin_config.h                # Pin configuration reference
+│   ├── smartstop_main.ino          # Original main ESP32 sketch with API auth
+│   ├── cs3237speaker.ino           # Individual speaker sketch
+│   ├── cs3237_mic.ino              # Individual microphone sketch
+│   ├── esp32_ir_people_counter.ino # Individual IR sensor sketch
+│   └── ultrasonic_sensors/         # Individual ultrasonic sensor sketch
+├── esp32_cam/                       # ESP32 firmware code
+|   ├── camera_pins.h               # Header Pins for ESP32CAM
+│   └── CameraPhotoCapture.ino      # Main ESP32CAM sketch with Flask server image publishing
 ├── server/
 │   ├── flask/                 # Flask image server
 │   │   ├── image_server.py   # Flask application with dual upload modes
@@ -175,6 +183,14 @@ sudo systemctl start mosquitto telegraf influxdb flask-image-server
 
 ### ESP32 Setup
 
+#### Option 1: Integrated Sensors (Recommended for All-in-One Setup)
+
+Use `esp32/integrated_sensors.ino` for a complete sensor system combining:
+- Speaker (MAX98357A) with MP3 playback
+- Microphone (INMP441) with voice detection
+- IR sensors for people counting
+- Ultrasonic sensors for occupancy detection
+
 1. **Install Arduino IDE** and ESP32 board support:
    - Open Arduino IDE
    - Go to File > Preferences
@@ -187,24 +203,55 @@ sudo systemctl start mosquitto telegraf influxdb flask-image-server
 
 2. **Install Required Libraries**:
    - Tools > Manage Libraries
-   - Install: PubSubClient, ArduinoJson, HTTPClient
+   - Install: 
+     - PubSubClient (MQTT)
+     - ArduinoJson
+     - arduinoFFT (for microphone)
+     - ESP32-audioI2S (for speaker: AudioFileSourceSD, AudioOutputI2S, AudioGeneratorMP3)
+     - ESP32MQTTClient
 
 3. **Configure WiFi and Server Details**:
-   - Open `esp32/smartstop_main.ino`
+   - Open `esp32/integrated_sensors.ino`
    - Update:
      ```cpp
-     const char* ssid = "YOUR_WIFI_SSID";
-     const char* password = "YOUR_WIFI_PASSWORD";
-     const char* mqtt_server = "157.230.250.226";  // Production server
-     const char* flask_server = "http://157.230.250.226:5000";
-     const char* api_key = "CS3237-Group10-SecretKey";  // Must match server!
+     const char* WIFI_SSID = "YOUR_WIFI_SSID";
+     const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
+     const char* MQTT_HOST = "157.230.250.226";  // Production server
+     const char* DEVICE_ID = "esp32-integrated-01";  // Unique device ID
      ```
 
-4. **Upload to ESP32**:
+4. **Wire Hardware** following the pin configuration in `esp32/INTEGRATED_SENSORS_README.md`
+
+5. **Prepare SD Card** with MP3 files in `/MP3/` folder (for speaker functionality)
+
+6. **Upload to ESP32**:
    - Connect ESP32 via USB
    - Select Board: Tools > Board > ESP32 Dev Module
    - Select Port: Tools > Port > (your port)
    - Click Upload
+
+📖 **Full documentation**: See `esp32/INTEGRATED_SENSORS_README.md` and `esp32/PIN_MIGRATION_GUIDE.md`
+
+#### Option 2: Individual Sensor Sketches
+
+For testing individual components, use the separate sketch files:
+- `esp32/cs3237speaker.ino` - Speaker only
+- `esp32/cs3237_mic.ino` - Microphone only
+- `esp32/esp32_ir_people_counter.ino` - IR sensors only
+- `esp32/ultrasonic_sensors/ultrasonic_sensors.ino` - Ultrasonic sensors only
+
+#### Option 3: Camera with Basic Sensors
+
+Use `esp32/smartstop_main.ino` for the original setup with camera support:
+   ```cpp
+   const char* ssid = "YOUR_WIFI_SSID";
+   const char* password = "YOUR_WIFI_PASSWORD";
+   const char* mqtt_server = "157.230.250.226";  // Production server
+     const char* flask_server = "http://157.230.250.226:5000";
+     const char* api_key = "CS3237-Group10-SecretKey";  // Must match server!
+   ```
+
+**Upload to ESP32** following the same steps as Option 1.
 
 ## 🔧 Configuration
 
