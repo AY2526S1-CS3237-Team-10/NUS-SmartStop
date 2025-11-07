@@ -92,17 +92,20 @@ The following pins were reassigned to avoid conflicts:
 ### 3. IR Sensor System
 - Bidirectional people counting
 - Detects entry and exit events
-- Sequence detection within 1000ms window
+- Non-blocking state machine for sequence detection (1000ms window)
+- Debounce mechanism to prevent false triggers (500ms)
 - Prevents count from going negative
 - Real-time MQTT updates on count changes
+- Does not block other sensor operations
 
 ### 4. Ultrasonic Sensor System
 - Three-zone occupancy detection (LEFT, CENTER, RIGHT)
 - Distance measurements in centimeters
-- Configurable detection range (20-400cm)
+- Configurable detection range (200-400cm by default)
 - Density calculation (percentage of occupied zones)
 - 2-second reading interval
 - MQTT publishing with detailed sensor data
+- Non-blocking ultrasonic pulse reading
 
 ## Required Libraries
 

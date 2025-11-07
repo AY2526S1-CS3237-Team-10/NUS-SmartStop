@@ -131,8 +131,8 @@ const int SENSOR_COUNT = 3;
 const int trigPins[SENSOR_COUNT] = {2, 16, 12};   // Changed pins
 const int echoPins[SENSOR_COUNT] = {4, 17, 13};   // Changed pins
 const String SECTION_NAMES[SENSOR_COUNT] = {"LEFT", "CENTER", "RIGHT"};
-const int MIN_DISTANCE = 200;  // 20cm
-const int MAX_DISTANCE = 400;  // 400cm
+const int MIN_DISTANCE = 200;  // 200cm minimum detection distance
+const int MAX_DISTANCE = 400;  // 400cm maximum detection distance
 const int READ_INTERVAL = 2000;
 
 int sensorDistances[SENSOR_COUNT];
@@ -169,6 +169,7 @@ int readUltrasonicSensor(int index);
 void calculateDensity();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void printNetStatus();
+void playAudio(int audioNum);
 
 // ==================== Setup ====================
 void setup() {
