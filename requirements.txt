@@ -14,10 +14,11 @@ opencv-python==4.8.1.78
 
 # ML/AI dependencies
 numpy==1.26.2
-torch==2.1.1
-torchvision==0.16.1
+torch==2.1.1+cpu
+torchvision==0.16.1+cpu
 tensorflow==2.15.0
 
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
+
