@@ -95,9 +95,12 @@ def initialize_ml():
 
 def run_inference(image_path):
     """Runs prediction on a single image file"""
-    if ML_MODEL is None: return None, 0.0
+    if ML_MODEL is None: 
+        print("⚠️ [ML] Model not initialized!")
+        return None, 0.0
 
     try:
+        print(f"🔍 [ML] Running inference on {image_path}...")
         img = Image.open(image_path).convert('RGB')
         input_tensor = ML_TRANSFORM(img).unsqueeze(0).to(ML_DEVICE)
         
@@ -109,6 +112,7 @@ def run_inference(image_path):
         
         result = ML_CLASSES[top_catid.item()]
         confidence = top_prob.item() * 100
+        print(f"✅ [ML] Prediction: {result}, Confidence: {confidence:.2f}%")
         return result, confidence
     except Exception as e:
         print(f"❌ [Inference Error] {e}")
@@ -125,8 +129,7 @@ def publish_mqtt(device_id, result, confidence):
             "confidence": round(confidence, 2),
             "source": "cloud_cnn"
         }
-        # One-shot publish
-        mqtt.Client().connect(MQTT_BROKER, MQTT_PORT).publish(MQTT_TOPIC, json.dumps(payload))
+        MQTT_CLIENT.publish(MQTT_TOPIC, json.dumps(payload))
         print(f"📡 [MQTT] Published: {result} ({confidence:.1f}%)")
     except Exception as e:
         print(f"⚠️ [MQTT Error] {e}")
@@ -166,16 +169,6 @@ def upload_image():
             writer.writerow([
                 timestamp.isoformat(), filename, len(image_data), 
                 device_id, ml_result, round(ml_conf, 2)
-            ])
-        
-        # Log metadata
-        with open(METADATA_FILE, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                timestamp.isoformat(),
-                filename,
-                len(image_data),
-                device_id
             ])
         
         return jsonify({
@@ -290,7 +283,11 @@ def index():
     return html
 
 if __name__ == '__main__':
+    initialize_ml()
     print("🚀 Starting CS3237 Image Server...")
     print(f"📁 Images saved to: {IMAGE_FOLDER}")
     print(f"📊 Metadata logged to: {METADATA_FILE}")
+    MQTT_CLIENT = mqtt.Client()
+    MQTT_CLIENT.connect(MQTT_BROKER, MQTT_PORT)
+    MQTT_CLIENT.loop_start()
     app.run(host='0.0.0.0', port=5000, debug=False)
