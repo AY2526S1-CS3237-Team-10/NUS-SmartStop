@@ -3,7 +3,6 @@ from datetime import datetime
 import os
 import csv
 import json
-import threading
 
 app = Flask(__name__)
 import torch
