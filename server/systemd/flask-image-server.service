@@ -1,18 +1,17 @@
 [Unit]
-Description=Flask Image Server for NUS SmartStop
-After=network.target
+Description=CS3237 Flask Image Server
+After=network.target mosquitto.service influxdb.service
 
 [Service]
 Type=simple
 User=root
+
 WorkingDirectory=/root/cs3237_server
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-Environment="FLASK_APP=image_server.py"
-Environment="UPLOAD_FOLDER=/root/cs3237_server/uploads"
-Environment="API_KEY=CS3237-Group10-SecretKey"
-ExecStart=/usr/bin/python3 /root/cs3237_server/image_server.py
+ExecStart=/root/venv/bin/python /root/cs3237_server/image_server.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
