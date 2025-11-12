@@ -132,7 +132,7 @@ Control System → MQTT Publish → MQTT Broker → ESP32 Subscribe → Action
 **Technologies:**
 - Eclipse Mosquitto
 - MQTT protocol v3.1.1/v5.0
-- Docker containerized
+- Managed via systemd on Ubuntu
 
 ### Flask Server (Image Handler)
 
@@ -172,7 +172,7 @@ Control System → MQTT Publish → MQTT Broker → ESP32 Subscribe → Action
 **Technologies:**
 - InfluxDB 2.x
 - Flux query language
-- Docker containerized
+- Native installation via systemd
 
 ### ML Models (Intelligence Layer)
 
@@ -329,7 +329,7 @@ location: "bus_stop_01"
 - Debug mode enabled
 
 ### Production
-- Docker Compose deployment
+- Native systemd deployment on Ubuntu 24.04
 - Multiple ESP32 devices
 - Monitoring and alerting
 - Data backup strategies

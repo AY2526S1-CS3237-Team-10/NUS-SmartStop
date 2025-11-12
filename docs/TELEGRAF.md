@@ -158,10 +158,6 @@ mosquitto_pub -h localhost \
 
 Check Telegraf logs:
 ```bash
-# Docker
-docker-compose logs -f telegraf
-
-# Native
 sudo journalctl -u telegraf -f
 ```
 
@@ -252,7 +248,7 @@ Telegraf exposes internal metrics. Add to telegraf.conf:
 **Solutions**:
 1. Reduce `metric_buffer_limit` in telegraf.conf
 2. Increase `flush_interval` to batch more writes
-3. Monitor with `docker stats` (Docker) or `top` (native)
+3. Monitor system resources with `top`, `htop`, or `systemctl status telegraf`
 
 ## Advanced Configuration
 
