@@ -15,6 +15,12 @@ NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
 - **Flask** web server with dual upload modes and API key authentication
 - **ML models** for image analysis and predictions
 
+### Project Statistics
+- **Python code**: ~950 lines
+- **ESP32 firmware**: ~290 lines
+- **Documentation**: Comprehensive guides in `docs/` folder
+- **Deployment**: Native Ubuntu 24.04 with systemd (no Docker)
+
 ## 📁 Project Structure
 
 ```
@@ -123,6 +129,8 @@ Camera (ESP32-CAM):
 
 ## 🚀 Quick Start
 
+**Note**: This project does NOT use Docker. All services run natively using systemd or directly via Python.
+
 ### For Development (Local Testing)
 
 ```bash
@@ -146,32 +154,135 @@ python server/flask/image_server.py
 
 ### For Production Deployment (Ubuntu 24.04)
 
-**See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.**
+This project uses **native systemd services** (no Docker). Follow these steps for manual deployment:
 
-Quick summary:
+#### 1. Install Required Packages
+
 ```bash
-# 1. Install services
-sudo apt install mosquitto telegraf influxdb2 python3-pip
+# Update system
+sudo apt update && sudo apt upgrade -y
 
-# 2. Setup InfluxDB
-influx setup --org "NUS SmartStop" --bucket sensor_data
+# Install services
+sudo apt install -y mosquitto mosquitto-clients telegraf influxdb2 python3-pip python3-venv
+```
 
-# 3. Deploy files (see DEPLOYMENT.md for details)
-sudo cp server/flask/image_server.py /root/cs3237_server/image_server.py
-sudo cp telegraf.conf /etc/telegraf/telegraf.conf
+#### 2. Setup InfluxDB
+
+```bash
+# Start InfluxDB service
+sudo systemctl start influxdb
+sudo systemctl enable influxdb
+
+# Initial setup (one-time)
+influx setup \
+  --username admin \
+  --password <secure-password> \
+  --org "NUS SmartStop" \
+  --bucket sensor_data \
+  --retention 30d \
+  --force
+
+# Generate API token for Telegraf
+influx auth create --org "NUS SmartStop" --all-access
+# Save the token - you'll need it for telegraf.conf
+```
+
+#### 3. Deploy Mosquitto MQTT Broker
+
+```bash
+# Copy configuration
 sudo cp server/systemd/mosquitto-cs3237.conf /etc/mosquitto/conf.d/cs3237.conf
 
-# 4. Configure environment
+# Start and enable service
+sudo systemctl restart mosquitto
+sudo systemctl enable mosquitto
+
+# Verify it's running
+sudo systemctl status mosquitto
+```
+
+#### 4. Deploy Telegraf
+
+```bash
+# Copy configuration
+sudo cp telegraf.conf /etc/telegraf/telegraf.conf
+
+# IMPORTANT: Edit config to add your InfluxDB token
+sudo nano /etc/telegraf/telegraf.conf
+# Update line: token = "YOUR_INFLUXDB_TOKEN_HERE"
+
+# Copy systemd service file
+sudo cp server/systemd/telegraf.service /etc/systemd/system/telegraf.service
+
+# Start and enable service
+sudo systemctl daemon-reload
+sudo systemctl start telegraf
+sudo systemctl enable telegraf
+
+# Verify it's running
+sudo systemctl status telegraf
+```
+
+#### 5. Deploy Flask Image Server
+
+```bash
+# Create deployment directory
+sudo mkdir -p /root/cs3237_server/uploads
+
+# Copy Flask application
+sudo cp server/flask/image_server.py /root/cs3237_server/image_server.py
+
+# Install Python dependencies
+cd /root/cs3237_server
+sudo python3 -m venv venv
+source venv/bin/activate
+pip install -r /path/to/NUS-SmartStop/server/flask/requirements.txt
+
+# Create environment file
 cat > /root/cs3237_server/.env << 'EOF'
 API_KEY=CS3237-Group10-SecretKey
-UPLOAD_FOLDER=/root/cs3237_server/images
+UPLOAD_FOLDER=/root/cs3237_server/uploads
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000
+MAX_CONTENT_LENGTH=16777216
 EOF
 
-# 5. Start services
-sudo systemctl start mosquitto telegraf influxdb flask-image-server
+# Copy systemd service file
+sudo cp server/systemd/flask-image-server.service /etc/systemd/system/flask-image-server.service
+
+# Edit service to use venv Python (if needed)
+sudo nano /etc/systemd/system/flask-image-server.service
+# Set: ExecStart=/root/cs3237_server/venv/bin/python3 /root/cs3237_server/image_server.py
+
+# Start and enable service
+sudo systemctl daemon-reload
+sudo systemctl start flask-image-server
+sudo systemctl enable flask-image-server
+
+# Verify it's running
+sudo systemctl status flask-image-server
+curl http://localhost:5000/health
 ```
+
+#### 6. Verify All Services
+
+```bash
+# Check status of all services
+sudo systemctl status mosquitto telegraf influxdb flask-image-server
+
+# Test MQTT
+mosquitto_sub -h localhost -t "#" -v
+
+# Test Flask
+curl http://localhost:5000/health
+
+# View logs if needed
+sudo journalctl -u mosquitto -f
+sudo journalctl -u telegraf -f
+sudo journalctl -u flask-image-server -f
+```
+
+**For complete deployment guide with troubleshooting, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
 
 ### ESP32 Setup
 
@@ -205,6 +316,67 @@ sudo systemctl start mosquitto telegraf influxdb flask-image-server
    - Select Board: Tools > Board > ESP32 Dev Module
    - Select Port: Tools > Port > (your port)
    - Click Upload
+
+## 🔄 Service Management
+
+Once deployed, manage your systemd services with these commands:
+
+### Check Service Status
+```bash
+# Check individual services
+sudo systemctl status mosquitto
+sudo systemctl status telegraf
+sudo systemctl status influxdb
+sudo systemctl status flask-image-server
+
+# Check all at once
+sudo systemctl status mosquitto telegraf influxdb flask-image-server
+```
+
+### Restart Services
+```bash
+# Restart individual service
+sudo systemctl restart flask-image-server
+
+# Restart all services
+sudo systemctl restart mosquitto telegraf influxdb flask-image-server
+```
+
+### View Service Logs
+```bash
+# Follow logs in real-time
+sudo journalctl -u flask-image-server -f
+sudo journalctl -u telegraf -f
+sudo journalctl -u mosquitto -f
+
+# View last 100 lines
+sudo journalctl -u flask-image-server -n 100
+
+# View logs since 1 hour ago
+sudo journalctl -u telegraf --since "1 hour ago"
+```
+
+### Stop/Start Services
+```bash
+# Stop service
+sudo systemctl stop flask-image-server
+
+# Start service
+sudo systemctl start flask-image-server
+
+# Enable service to start on boot
+sudo systemctl enable flask-image-server
+
+# Disable service from starting on boot
+sudo systemctl disable flask-image-server
+```
+
+### Update Configuration
+```bash
+# After updating configuration files
+sudo systemctl daemon-reload
+sudo systemctl restart <service-name>
+```
 
 ## 🔧 Configuration
 
