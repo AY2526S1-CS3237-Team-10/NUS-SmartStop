@@ -38,11 +38,11 @@
 // ===========================
 // Configuration
 // ===========================
-const char *ssid = "Ken Phone";
-const char *password = "Estri333";
+const char *ssid = "YOUR_WIFI_SSID";
+const char *password = "YOUR_WIFI_PASSWORD";
 
 // Flask Server Configuration
-const char* serverURL = "http://157.230.250.226:5000/upload";  // Update this with your Flask server IP
+const char* serverURL = "http://YOUR_FLASK_SERVER_IP:5000/upload";  // Update this with your Flask server IP
 
 // Photo capture settings
 #define CAPTURE_INTERVAL 60000  // Capture interval in milliseconds (60 seconds = 1 minute)
@@ -311,7 +311,7 @@ bool uploadToServer(camera_fb_t * fb, int attemptNum) {
     Serial.println("ERROR: Send header failed");
   } else if (httpResponseCode == -3) {
     Serial.println("ERROR: Connection refused - server not running or unreachable");
-    Serial.println("  - Check Flask server is running on 157.230.250.226:5000");
+    Serial.println("  - Check Flask server is running on YOUR_SERVER_IP:5000");
     Serial.println("  - Check firewall allows port 5000");
     Serial.println("  - Verify ESP32 can reach the server");
   } else if (httpResponseCode == -4) {

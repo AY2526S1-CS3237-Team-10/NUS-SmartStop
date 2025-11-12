@@ -16,7 +16,7 @@ from datetime import datetime
 
 
 # MQTT Configuration
-MQTT_BROKER = "157.230.250.226"
+MQTT_BROKER = "YOUR_MQTT_BROKER_IP"
 MQTT_PORT = 1883
 MQTT_TOPIC = "nus-smartstop/weather/data"
 DEVICE_ID = "ESP32-CAM"

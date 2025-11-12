@@ -4,7 +4,7 @@ This guide explains how to deploy the NUS SmartStop system on Ubuntu 24.04 using
 
 ## Server Information
 
-- **Deployment Server**: 157.230.250.226 (DigitalOcean Droplet)
+- **Deployment Server**: YOUR_SERVER_IP (Configure as needed)
 - **OS**: Ubuntu 24.04 LTS
 - **Services**: Mosquitto, Telegraf, InfluxDB, Flask (all running natively with systemd)
 
@@ -121,7 +121,7 @@ cat << EOF | sudo tee /root/cs3237_server/.env
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000
 UPLOAD_FOLDER=/root/cs3237_server/uploads
-API_KEY=CS3237-Group10-SecretKey
+API_KEY=YOUR_SECURE_API_KEY
 EOF
 
 # Start and enable service
@@ -206,7 +206,7 @@ curl http://127.0.0.1:5000/health
 
 # Test image upload (with API key)
 curl -X POST \
-  -H "X-API-Key: CS3237-Group10-SecretKey" \
+  -H "X-API-Key: YOUR_SECURE_API_KEY" \
   -F "image=@test_image.jpg" \
   -F "device_id=esp32_001" \
   http://127.0.0.1:5000/upload
@@ -399,4 +399,4 @@ For deployment issues:
 
 ---
 
-**Note**: This deployment assumes Ubuntu 24.04 LTS on DigitalOcean droplet at 157.230.250.226. Adjust paths and configurations as needed for different environments.
+**Note**: This deployment guide is for Ubuntu 24.04 LTS. Replace YOUR_SERVER_IP, YOUR_SECURE_API_KEY, and other placeholders with your actual configuration. Adjust paths and configurations as needed for different environments.

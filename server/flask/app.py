@@ -26,7 +26,7 @@ app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # API Key for authentication
-API_KEY = os.getenv('API_KEY', 'CS3237-Group10-SecretKey')
+API_KEY = os.getenv('API_KEY', 'CHANGE_ME_INSECURE_DEFAULT')
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

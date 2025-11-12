@@ -6,9 +6,9 @@
 #include "driver/gpio.h"
 
 // ================= WIFI / MQTT ================
-const char* WIFI_SSID = "test";
-const char* WIFI_PASS = "abcdefgh";
-const char* MQTT_HOST = "157.230.250.226";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
+const char* MQTT_HOST = "YOUR_MQTT_BROKER_IP";
 const uint16_t MQTT_PORT = 1883;
 
 WiFiClient espClient;
