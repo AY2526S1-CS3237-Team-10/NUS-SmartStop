@@ -12,8 +12,8 @@ const int trigPins[SENSOR_COUNT] = {5, 22, 13};
 const int echoPins[SENSOR_COUNT] = {18, 23, 14};
 const String SECTION_NAMES[SENSOR_COUNT] = {"LEFT", "CENTER", "RIGHT"};
 
-const int MIN_DISTANCE = 200; //20cm for testing purposes
-const int MAX_DISTANCE = 400; //in cm
+const int MIN_DISTANCE = 10; //20cm for testing purposes
+const int MAX_DISTANCE = 13; //in cm
 const int READ_INTERVAL = 2000; 
 
 int sensorDistances[SENSOR_COUNT];
