@@ -61,7 +61,7 @@ void readAllSensors() {
     sensorStates[i] = (sensorDistances[i] >= MIN_DISTANCE && sensorDistances[i] <= MAX_DISTANCE); 
   }
 
-  Serial.println("\n--- Sensor Readings ---");
+  Serial.println("\nSensor Readings");
   for (int i = 0; i < SENSOR_COUNT; i++) {
     Serial.print(SECTION_NAMES[i]);
     Serial.print(": ");
