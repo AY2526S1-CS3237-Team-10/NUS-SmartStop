@@ -515,12 +515,6 @@ The root endpoint (`/`) displays a responsive web gallery:
 - **Cause**: Missing or incorrect API key
 - **Solution**: Verify `X-API-Key` header matches server's `.env` API_KEY
 
-### ESP32 Connection Issues
-- Verify WiFi credentials
-- Check server IP addresses (157.230.250.226)
-- Ensure Flask/MQTT broker is running
-- Check firewall: `sudo ufw status`
-
 ### Camera Issues
 - Verify pin configuration matches your camera module
 - Check power supply (camera requires stable 5V)
