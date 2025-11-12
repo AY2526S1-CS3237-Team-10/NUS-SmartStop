@@ -1,5 +1,7 @@
 # Telegraf Setup Guide for NUS-SmartStop
 
+**Note**: This project does NOT use Docker. Telegraf is installed and managed via systemd.
+
 ## What is Telegraf?
 
 Telegraf is a plugin-driven server agent for collecting and sending metrics and events. For NUS-SmartStop, it bridges MQTT messages to InfluxDB, replacing the custom Python MQTT client.
@@ -16,52 +18,40 @@ Telegraf is a plugin-driven server agent for collecting and sending metrics and 
 ## Architecture
 
 ```
-ESP32 Devices → MQTT Broker → Telegraf → InfluxDB
-                                ↓
-                          Flask Server (for images)
+ESP32 Devices → MQTT Broker (Mosquitto) → Telegraf → InfluxDB
+                                            ↓
+                                      Flask Server (for images)
 ```
 
 ## Installation
 
-### Option 1: Docker (Recommended)
-
-Already configured in `docker-compose.yml`:
-
+### Ubuntu/Debian (Recommended)
 ```bash
-# Start services
-docker-compose up -d
+# Update system
+sudo apt update
 
-# Check Telegraf logs
-docker-compose logs -f telegraf
-
-# Restart Telegraf after config changes
-docker-compose restart telegraf
-```
-
-### Option 2: Native Installation
-
-#### Ubuntu/Debian
-```bash
-# Add InfluxData repository
-wget -q https://repos.influxdata.com/influxdata-archive_compat.key
-echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c && cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
-echo 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main' | sudo tee /etc/apt/sources.list.d/influxdata.list
-
-sudo apt-get update
-sudo apt-get install telegraf
+# Install Telegraf
+sudo apt install -y telegraf
 
 # Copy configuration
 sudo cp telegraf.conf /etc/telegraf/telegraf.conf
 
-# Start service
+# IMPORTANT: Edit config to add your InfluxDB token
+sudo nano /etc/telegraf/telegraf.conf
+# Update line: token = "YOUR_INFLUXDB_TOKEN_HERE"
+
+# Start and enable service
 sudo systemctl enable telegraf
 sudo systemctl start telegraf
 
 # Check status
 sudo systemctl status telegraf
+
+# View logs
+sudo journalctl -u telegraf -f
 ```
 
-#### macOS
+### macOS
 ```bash
 # Install via Homebrew
 brew install telegraf
@@ -76,7 +66,7 @@ brew services start telegraf
 tail -f /usr/local/var/log/telegraf.log
 ```
 
-#### Windows
+### Windows
 1. Download from https://portal.influxdata.com/downloads/
 2. Extract to `C:\Program Files\Telegraf\`
 3. Copy `telegraf.conf` to `C:\Program Files\Telegraf\`
@@ -197,22 +187,23 @@ influx query 'from(bucket: "sensor_data") |> range(start: -1h) |> filter(fn: (r)
 ### Health Check
 
 ```bash
-# Check if Telegraf is running
-docker-compose ps telegraf  # Docker
-sudo systemctl status telegraf  # Native Linux
-brew services list | grep telegraf  # macOS
+# Check if Telegraf is running (Linux with systemd)
+sudo systemctl status telegraf
+
+# macOS
+brew services list | grep telegraf
 ```
 
 ### View Logs
 
 ```bash
-# Docker
-docker-compose logs -f telegraf
-
-# Native Linux
+# Linux with systemd
 sudo journalctl -u telegraf -f
 
-# Native macOS
+# View last 100 lines
+sudo journalctl -u telegraf -n 100
+
+# macOS
 tail -f /usr/local/var/log/telegraf.log
 ```
 
@@ -232,8 +223,8 @@ Telegraf exposes internal metrics. Add to telegraf.conf:
 **Symptoms**: Logs show connection errors
 
 **Solutions**:
-1. Check MQTT broker is running: `docker-compose ps mosquitto`
-2. Verify MQTT_BROKER in .env: should be `localhost` or `mosquitto` (service name)
+1. Check MQTT broker is running: `sudo systemctl status mosquitto`
+2. Verify MQTT broker address in telegraf.conf: should be `127.0.0.1:1883`
 3. Check firewall: `sudo ufw status`
 4. Test MQTT directly: `mosquitto_sub -h localhost -t "#" -v`
 
@@ -316,12 +307,12 @@ Add processors:
 The custom Python MQTT client (`server/mqtt/mqtt_client.py`) is **deprecated** in favor of Telegraf.
 
 **Migration steps**:
-1. ✅ Stop custom MQTT client
+1. ✅ Stop custom MQTT client (if using)
 2. ✅ Configure telegraf.conf with your settings
-3. ✅ Update .env with InfluxDB details
-4. ✅ Start Telegraf: `docker-compose up -d telegraf`
+3. ✅ Add InfluxDB token to telegraf.conf
+4. ✅ Start Telegraf: `sudo systemctl start telegraf`
 5. ✅ Verify data flow (see Testing section)
-6. ✅ Remove custom client from startup scripts
+6. ✅ Remove custom client from startup scripts (if any)
 
 ## Additional Resources
 

@@ -1,10 +1,12 @@
 # Installation Guide
 
+**Note**: This project does NOT use Docker. All services are installed and managed natively.
+
 ## Prerequisites
 
 ### For Development Machine (Server)
 - Python 3.8 or higher
-- Docker and Docker Compose (optional but recommended)
+- Ubuntu 24.04 LTS (recommended) or compatible Linux distribution
 - Git
 
 ### For ESP32 Development
@@ -16,103 +18,112 @@
 
 ### 1. Server Installation
 
-#### Install Python Dependencies
-
-```bash
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-#### Install Docker (Optional but Recommended)
+#### Install System Packages
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get update
-sudo apt-get install docker.io docker-compose
-sudo usermod -aG docker $USER
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install required services
+sudo apt install -y mosquitto mosquitto-clients telegraf influxdb2 python3-pip python3-venv
 ```
 
-**macOS:**
+#### Install Python Dependencies
+
 ```bash
-brew install docker docker-compose
-```
+# Clone repository
+git clone https://github.com/AY2526S1-CS3237-Team-10/NUS-SmartStop.git
+cd NUS-SmartStop
 
-**Windows:**
-Download and install [Docker Desktop](https://www.docker.com/products/docker-desktop)
+# Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r server/flask/requirements.txt
+```
 
 #### Setup Environment Variables
 
 ```bash
 # Copy example environment file
-cp .env.example .env
+cp server/flask/.env.example server/flask/.env
 
 # Edit .env file with your configuration
-nano .env  # or use your preferred editor
+nano server/flask/.env  # or use your preferred editor
 ```
 
 Key configurations to update:
-- `INFLUXDB_TOKEN`: Generate a secure token
-- `MQTT_BROKER`: Set to your machine's IP if ESP32 is on different network
+- `API_KEY`: Set a secure API key (must match ESP32 code!)
+- `UPLOAD_FOLDER`: Path for storing images
 - `FLASK_HOST`: Set to `0.0.0.0` to accept connections from ESP32
+- `INFLUXDB_TOKEN`: Generate from InfluxDB setup (see below)
 
-#### Start Services
+#### Configure Services
 
-**Using Docker (Recommended):**
-```bash
-# Start InfluxDB and MQTT broker
-docker-compose up -d
-
-# Check services are running
-docker-compose ps
-
-# View logs
-docker-compose logs -f
-```
-
-**Manual Installation:**
-
-1. **Install InfluxDB 2.x**
+1. **Setup InfluxDB**
    ```bash
-   # Ubuntu/Debian
-   wget https://dl.influxdata.com/influxdb/releases/influxdb2-2.7.1-amd64.deb
-   sudo dpkg -i influxdb2-2.7.1-amd64.deb
+   # Start InfluxDB
    sudo systemctl start influxdb
+   sudo systemctl enable influxdb
    
-   # macOS
-   brew install influxdb
-   influxd
+   # Initial setup via web UI
+   # Open http://localhost:8086 in browser
+   # Or use CLI:
+   influx setup \
+     --username admin \
+     --password <secure-password> \
+     --org "NUS SmartStop" \
+     --bucket sensor_data \
+     --retention 30d \
+     --force
+   
+   # Generate API token for Telegraf
+   influx auth create --org "NUS SmartStop" --all-access
+   # Save this token - you'll need it for telegraf.conf
    ```
 
-2. **Install Mosquitto MQTT**
+2. **Configure Mosquitto MQTT**
    ```bash
-   # Ubuntu/Debian
-   sudo apt-get install mosquitto mosquitto-clients
+   # Copy configuration (if using custom config)
+   sudo cp server/systemd/mosquitto-cs3237.conf /etc/mosquitto/conf.d/cs3237.conf
    
-   # macOS
-   brew install mosquitto
-   brew services start mosquitto
+   # Start Mosquitto
+   sudo systemctl start mosquitto
+   sudo systemctl enable mosquitto
+   
+   # Verify it's running
+   sudo systemctl status mosquitto
    ```
 
-3. **Configure InfluxDB**
-   - Open http://localhost:8086
-   - Complete initial setup
-   - Create organization: `smartstop`
-   - Create bucket: `sensor_data`
-   - Generate API token and update `.env`
+3. **Configure Telegraf**
+   ```bash
+   # Copy configuration
+   sudo cp telegraf.conf /etc/telegraf/telegraf.conf
+   
+   # IMPORTANT: Edit to add your InfluxDB token
+   sudo nano /etc/telegraf/telegraf.conf
+   # Update line: token = "YOUR_INFLUXDB_TOKEN_HERE"
+   
+   # Start Telegraf
+   sudo systemctl start telegraf
+   sudo systemctl enable telegraf
+   
+   # Verify it's running
+   sudo systemctl status telegraf
+   ```
 
-#### Start Application Servers
+#### Start Flask Server (Development Mode)
+
+For development/testing, you can run Flask server directly:
 
 ```bash
-# Terminal 1: Start Flask server
-python server/flask/app.py
-
-# Terminal 2: Start MQTT client
-python server/mqtt/mqtt_client.py
+# Start Flask server
+python server/flask/image_server.py
 ```
+
+For production deployment with systemd, see [docs/DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### 2. ESP32 Installation
 
@@ -203,13 +214,14 @@ Most ESP32-CAM modules have cameras pre-wired.
    mosquitto_sub -h localhost -t "#" -v
    
    # In another terminal, publish test message
-   mosquitto_pub -h localhost -t "smartstop/test" -m "Hello"
+   mosquitto_pub -h localhost -t "nus-smartstop/test" -m "Hello"
    ```
 
 3. **Test InfluxDB:**
    - Open http://localhost:8086
-   - Login with credentials from docker-compose.yml
+   - Login with credentials from setup
    - Navigate to Data Explorer
+   - Check for sensor_data bucket
 
 ### Test ESP32
 
@@ -223,9 +235,12 @@ Most ESP32-CAM modules have cameras pre-wired.
 ### End-to-End Test
 
 1. ESP32 should publish sensor data to MQTT
-2. MQTT client should receive and store data in InfluxDB
+2. Telegraf should bridge MQTT data to InfluxDB
 3. Check InfluxDB for data:
    ```bash
+   # Query via CLI
+   influx query 'from(bucket: "sensor_data") |> range(start: -1h) |> limit(n: 10)'
+   
    # Or use InfluxDB UI at http://localhost:8086
    ```
 4. Upload test image via ESP32 or curl
@@ -245,7 +260,7 @@ Most ESP32-CAM modules have cameras pre-wired.
 - Check USB cable supports data (not just charging)
 
 ### MQTT Connection Failed
-- Verify Mosquitto is running: `docker-compose ps` or `systemctl status mosquitto`
+- Verify Mosquitto is running: `sudo systemctl status mosquitto`
 - Check firewall isn't blocking port 1883
 - Verify IP address is correct and reachable
 
