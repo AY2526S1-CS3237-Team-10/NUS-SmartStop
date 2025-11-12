@@ -1,28 +1,18 @@
 #!/bin/bash
 
-# Start script for NUS-SmartStop servers
-# This script starts all necessary services
+# Start script for NUS-SmartStop Flask server
+# Note: This project does NOT use Docker
+# Services like Mosquitto, Telegraf, and InfluxDB should be installed 
+# and managed via systemd on Ubuntu (see docs/DEPLOYMENT.md)
 
-echo "Starting NUS-SmartStop Services..."
-echo "=================================="
+echo "Starting NUS-SmartStop Flask Server..."
+echo "======================================="
 
-# Check if .env exists
-if [ ! -f .env ]; then
-    echo "Error: .env file not found!"
-    echo "Please copy .env.example to .env and configure it."
+# Check if .env exists in server/flask directory
+if [ ! -f server/flask/.env ]; then
+    echo "Error: server/flask/.env file not found!"
+    echo "Please copy server/flask/.env.example to server/flask/.env and configure it."
     exit 1
-fi
-
-# Check if Docker is available
-if command -v docker-compose &> /dev/null; then
-    echo "Starting Docker services (Mosquitto, Telegraf)..."
-    docker-compose up -d
-    
-    # Wait for services to be ready
-    echo "Waiting for services to be ready..."
-    sleep 5
-else
-    echo "Warning: docker-compose not found. Assuming manual service setup."
 fi
 
 # Check if Python virtual environment exists
@@ -35,38 +25,37 @@ fi
 
 # Check if dependencies are installed
 echo "Checking Python dependencies..."
-if ! python -c "import flask" &> /dev/null; then
+if ! python3 -c "import flask" &> /dev/null; then
     echo "Installing Python dependencies..."
-    pip install -r requirements.txt
+    pip3 install -r server/flask/requirements.txt
 fi
 
 # Create uploads directory if it doesn't exist
-mkdir -p uploads
+mkdir -p server/flask/uploads
 
 # Start Flask server in background
 echo "Starting Flask server..."
-python server/flask/app.py &
+python3 server/flask/image_server.py &
 FLASK_PID=$!
 echo "Flask server started (PID: $FLASK_PID)"
 
 echo ""
-echo "=================================="
-echo "All services started successfully!"
-echo "=================================="
+echo "======================================="
+echo "Flask server started successfully!"
+echo "======================================="
 echo ""
-echo "Services running:"
-echo "- MQTT Broker: localhost:1883"
-echo "- Telegraf: Bridging MQTT to InfluxDB"
-echo "- Flask API: http://localhost:5000"
+echo "Flask API: http://localhost:5000"
+echo "Process ID: $FLASK_PID"
 echo ""
-echo "Note: InfluxDB should be running externally"
-echo "Note: Telegraf handles MQTT to InfluxDB bridging"
+echo "IMPORTANT: Ensure these services are running via systemd:"
+echo "  - Mosquitto MQTT Broker (sudo systemctl status mosquitto)"
+echo "  - Telegraf (sudo systemctl status telegraf)"
+echo "  - InfluxDB (sudo systemctl status influxdb)"
 echo ""
-echo "Process IDs:"
-echo "- Flask: $FLASK_PID"
+echo "See docs/DEPLOYMENT.md for production setup with systemd"
 echo ""
-echo "To stop services, run: ./stop.sh"
-echo "Or press Ctrl+C and use: kill $FLASK_PID"
+echo "To stop Flask server, run: ./stop.sh"
+echo "Or use: kill $FLASK_PID"
 echo ""
 
 # Keep script running
