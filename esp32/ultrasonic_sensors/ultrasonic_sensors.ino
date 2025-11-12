@@ -2,9 +2,9 @@
 #include <WiFi.h>
 #include "ESP32MQTTClient.h"
 
-const char* ssid = "YOUR_WIFI_SSID"; 
-const char* pass = "YOUR_WIFI_PASSWORD"; 
-const char* mqttServer = "mqtt://YOUR_MQTT_BROKER_IP:1883";
+const char* ssid = "Tricia lim"; 
+const char* pass = "triciaisthebest"; 
+const char* mqttServer = "mqtt://157.230.250.226:1883";
 const char* mqttTopic = "nus-smartstop/ultrasonic/data";
 
 const int SENSOR_COUNT = 3;

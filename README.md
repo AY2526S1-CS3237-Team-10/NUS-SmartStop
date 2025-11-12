@@ -73,7 +73,7 @@ ESP32 Sensors → MQTT → Mosquitto → Telegraf → InfluxDB (Local)
 - **Flask**: Dual-mode image server (multipart + raw body) with API authentication and gallery UI
 
 **Deployment**: All services run natively on Ubuntu 24.04 using systemd (no Docker).  
-**Production Server**: YOUR_SERVER_IP (Configure as needed)
+**Production Server**: 157.230.250.226 (DigitalOcean, 512MB RAM)
 
 ## 🛠️ Hardware Requirements
 
@@ -163,7 +163,7 @@ sudo cp server/systemd/mosquitto-cs3237.conf /etc/mosquitto/conf.d/cs3237.conf
 
 # 4. Configure environment
 cat > /root/cs3237_server/.env << 'EOF'
-API_KEY=YOUR_SECURE_API_KEY
+API_KEY=CS3237-Group10-SecretKey
 UPLOAD_FOLDER=/root/cs3237_server/images
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000
@@ -195,9 +195,9 @@ sudo systemctl start mosquitto telegraf influxdb flask-image-server
      ```cpp
      const char* ssid = "YOUR_WIFI_SSID";
      const char* password = "YOUR_WIFI_PASSWORD";
-     const char* mqtt_server = "YOUR_MQTT_BROKER_IP";  // Your MQTT broker
-     const char* flask_server = "http://YOUR_FLASK_SERVER_IP:5000";
-     const char* api_key = "YOUR_SECURE_API_KEY";  // Must match server!
+     const char* mqtt_server = "157.230.250.226";  // Production server
+     const char* flask_server = "http://157.230.250.226:5000";
+     const char* api_key = "CS3237-Group10-SecretKey";  // Must match server!
      ```
 
 4. **Upload to ESP32**:
@@ -219,7 +219,7 @@ UPLOAD_FOLDER=/root/cs3237_server/images
 MAX_CONTENT_LENGTH=16777216  # 16MB max upload
 
 # Flask API Authentication (REQUIRED!)
-API_KEY=YOUR_SECURE_API_KEY
+API_KEY=CS3237-Group10-SecretKey
 
 # InfluxDB Configuration (Local)
 INFLUXDB_URL=http://127.0.0.1:8086
@@ -258,14 +258,14 @@ Response:
 }
 
 Example:
-curl http://YOUR_SERVER_IP:5000/health
+curl http://157.230.250.226:5000/health
 ```
 
 #### Upload Image (Raw Body - ESP32-CAM Compatible)
 ```bash
 POST /upload
 Headers:
-  X-API-Key: YOUR_SECURE_API_KEY
+  X-API-Key: CS3237-Group10-SecretKey
   Device-ID: ESP32_001
   Content-Type: image/jpeg
 Body: (raw image bytes)
@@ -280,18 +280,18 @@ Response:
 
 Example:
 curl -X POST \
-  -H "X-API-Key: YOUR_SECURE_API_KEY" \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
   -H "Device-ID: ESP32_001" \
   -H "Content-Type: image/jpeg" \
   --data-binary "@photo.jpg" \
-  http://YOUR_SERVER_IP:5000/upload
+  http://157.230.250.226:5000/upload
 ```
 
 #### Upload Image (Multipart - Web/Mobile Compatible)
 ```bash
 POST /upload
 Headers:
-  X-API-Key: YOUR_SECURE_API_KEY
+  X-API-Key: CS3237-Group10-SecretKey
 Content-Type: multipart/form-data
 Body:
   - image: (file)
@@ -301,10 +301,10 @@ Response: (same as raw body)
 
 Example:
 curl -X POST \
-  -H "X-API-Key: YOUR_SECURE_API_KEY" \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
   -F "image=@photo.jpg" \
   -F "device_id=esp32_001" \
-  http://YOUR_SERVER_IP:5000/upload
+  http://157.230.250.226:5000/upload
 ```
 
 #### List Images
@@ -328,7 +328,7 @@ Response:
 }
 
 Example:
-curl http://YOUR_SERVER_IP:5000/images
+curl http://157.230.250.226:5000/images
 ```
 
 #### Get Image
@@ -338,7 +338,7 @@ GET /images/<filename>
 Response: Image file (JPEG)
 
 Example:
-curl http://YOUR_SERVER_IP:5000/images/ESP32_001_20251026_172129.jpg
+curl http://157.230.250.226:5000/images/ESP32_001_20251026_172129.jpg
 ```
 
 #### Web Gallery
@@ -348,7 +348,7 @@ GET /
 Response: HTML gallery interface
 
 Access in browser:
-http://YOUR_SERVER_IP:5000/
+http://157.230.250.226:5000/
 ```
 
 ## 🔌 MQTT Topics
@@ -416,27 +416,27 @@ InfluxDB data can be visualized using:
 
 ```bash
 # Test Flask server health
-curl http://YOUR_SERVER_IP:5000/health
+curl http://157.230.250.226:5000/health
 
 # Test image upload with API key (should work)
 curl -X POST \
-  -H "X-API-Key: YOUR_SECURE_API_KEY" \
+  -H "X-API-Key: CS3237-Group10-SecretKey" \
   -H "Device-ID: test_device" \
   --data-binary "@test.jpg" \
-  http://YOUR_SERVER_IP:5000/upload
+  http://157.230.250.226:5000/upload
 
 # Test without API key (should fail with 401)
 curl -X POST \
   --data-binary "@test.jpg" \
-  http://YOUR_SERVER_IP:5000/upload
+  http://157.230.250.226:5000/upload
 
 # Test MQTT (using mosquitto_pub)
-mosquitto_pub -h YOUR_MQTT_BROKER_IP \
+mosquitto_pub -h 157.230.250.226 \
   -t "nus-smartstop/sensors/ultrasonic" \
   -m '{"deviceId":"test1","location":"test","distance":100,"timestamp":1698765432}'
 
 # Subscribe to all topics
-mosquitto_sub -h YOUR_MQTT_BROKER_IP -t "nus-smartstop/#" -v
+mosquitto_sub -h 157.230.250.226 -t "nus-smartstop/#" -v
 
 # Check Telegraf logs
 sudo journalctl -u telegraf -f
@@ -515,12 +515,6 @@ The root endpoint (`/`) displays a responsive web gallery:
 - **Cause**: Missing or incorrect API key
 - **Solution**: Verify `X-API-Key` header matches server's `.env` API_KEY
 
-### ESP32 Connection Issues
-- Verify WiFi credentials
-- Check server IP addresses (use YOUR_SERVER_IP)
-- Ensure Flask/MQTT broker is running
-- Check firewall: `sudo ufw status`
-
 ### Camera Issues
 - Verify pin configuration matches your camera module
 - Check power supply (camera requires stable 5V)
@@ -587,4 +581,4 @@ For issues and questions:
 
 **Note**: This is an educational project for CS3237 (Introduction to Internet of Things). Always follow safety guidelines when working with electronics and IoT devices.
 
-**Production Server**: Configure with your own server details (replace placeholders in code)
+**Production Server**: 157.230.250.226 (DigitalOcean, Ubuntu 24.04, 512MB RAM)
