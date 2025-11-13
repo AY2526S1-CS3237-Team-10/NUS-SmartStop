@@ -12,9 +12,8 @@ const int trigPins[SENSOR_COUNT] = {5, 22, 13};
 const int echoPins[SENSOR_COUNT] = {18, 23, 14};
 const String SECTION_NAMES[SENSOR_COUNT] = {"LEFT", "CENTER", "RIGHT"};
 
-const int MIN_DISTANCE = 10; //20cm for testing purposes
-const int MAX_DISTANCE = 13; //in cm
-const int READ_INTERVAL = 2000; 
+const int MAX_DISTANCES[SENSOR_COUNT] = {9, 9, 10};
+const int READ_INTERVAL = 3000; 
 
 int sensorDistances[SENSOR_COUNT];
 bool sensorStates[SENSOR_COUNT]; // true = occupied
@@ -56,18 +55,21 @@ void loop() {
 }
 
 void readAllSensors() {
-  for (int i = 0; i < SENSOR_COUNT; i++) {
-    sensorDistances[i] = readSensor(i);
-    sensorStates[i] = (sensorDistances[i] >= MIN_DISTANCE && sensorDistances[i] <= MAX_DISTANCE); 
+  for (int i = 0; i < SENSOR_COUNT; i++) 
+  {
+  sensorDistances[i] = readSensor(i);
+  sensorStates[i] = (sensorDistances[i] > 0 && sensorDistances[i] <= MAX_DISTANCES[i]);
+  delay(600); 
   }
 
-  Serial.println("\nSensor Readings");
+  Serial.println("\n Sensor Readings ");
   for (int i = 0; i < SENSOR_COUNT; i++) {
     Serial.print(SECTION_NAMES[i]);
     Serial.print(": ");
     if (sensorDistances[i] == 0) {
       Serial.println("[NO SIGNAL]");
-    } else {
+    } 
+    else {
       Serial.print(sensorDistances[i]);
       Serial.print(" cm -> ");
       Serial.println(sensorStates[i] ? "OCCUPIED" : "EMPTY");
@@ -76,15 +78,27 @@ void readAllSensors() {
 }
 
 int readSensor(int i) {
-  digitalWrite(trigPins[i], LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPins[i], HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPins[i], LOW);
+  const int samples = 3;   // take average 
+  long total = 0;
+  int validCount = 0;
 
-  long duration = pulseIn(echoPins[i], HIGH, 30000); 
-  if (duration == 0) return 0; // nothing sensed
-  return duration * 0.034 / 2;  // convert to cm
+  for (int s = 0; s < samples; s++) {
+    digitalWrite(trigPins[i], LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPins[i], HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPins[i], LOW);
+
+    long duration = pulseIn(echoPins[i], HIGH, 30000);
+    if (duration > 0) {
+      total += duration * 0.034 / 2; // convert to cm
+      validCount++;
+    }
+    delay(50);
+  }
+
+  if (validCount == 0) return 0;
+  return total / validCount; // average result
 }
 
 int occupiedVal(bool state) {
@@ -105,7 +119,7 @@ void calculateDensity() {
 
 void publishData() {
   if (!mqttClient.isConnected()) {
-    Serial.println("MQTT not connected. Skipping publish...");
+    Serial.println("MQTT not connected. Skipping publish");
     return;
   }
 
