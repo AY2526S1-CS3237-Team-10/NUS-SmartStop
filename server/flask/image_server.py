@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import csv
 import json
+from functools import wraps
 
 app = Flask(__name__)
 import torch
@@ -31,6 +32,20 @@ if not os.path.exists(METADATA_FILE):
     with open(METADATA_FILE, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['timestamp', 'filename', 'size_bytes', 'device_id'])
+        
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if X-API-Key header exists and matches our key
+        incoming_key = request.headers.get('X-API-Key')
+        
+        if incoming_key and incoming_key == API_KEY:
+            return f(*args, **kwargs)
+        else:
+            # Log the attempt
+            print(f"⛔ [Auth] Unauthorized access attempt from {request.remote_addr}")
+            return jsonify({'error': 'Unauthorized: Invalid or missing API Key'}), 401
+    return decorated_function
         
 # =========================================
 # ========= GLOBAL ML OBJECTS ============
@@ -135,6 +150,7 @@ def publish_mqtt(device_id, result, confidence):
         print(f"⚠️ [MQTT Error] {e}")
 
 @app.route('/upload', methods=['POST'])
+@require_api_key
 def upload_image():
     try:
         # Get raw image data
