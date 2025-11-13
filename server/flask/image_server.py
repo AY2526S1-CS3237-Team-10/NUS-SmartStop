@@ -27,6 +27,9 @@ MQTT_TOPIC = "nus-smartstop/crowd/data"
 
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
+# Add your API key here
+API_KEY = "Complex_Secret_Key_Group10_2025"
+
 # Initialize metadata CSV
 if not os.path.exists(METADATA_FILE):
     with open(METADATA_FILE, 'w', newline='') as f:
