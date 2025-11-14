@@ -244,6 +244,7 @@ bool uploadToServer(camera_fb_t *fb, int attemptNum) {
     return false;
   }
 
+  http.addHeader("X-API-Key", "Complex_Secret_Key_Group10_2025");
   http.addHeader("Content-Type", "image/jpeg");
   http.addHeader("Device-ID", "esp32-smartstop-camera-001");
 
