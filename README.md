@@ -2,6 +2,8 @@
 
 A comprehensive IoT solution for smart bus stops using ESP32, featuring real-time sensor monitoring, image capture and analysis, and ML-powered insights.
 
+Note: this README was generated with assistance from Copilot. There may be inaccuracies. 
+
 ## 📋 Table of Contents
 
 - [Project Overview](#-project-overview)
@@ -29,12 +31,6 @@ NUS-SmartStop is an IoT project designed for smart bus stops that integrates:
 - **InfluxDB** time-series database for sensor data (local)
 - **Flask** web server with dual upload modes and API key authentication
 - **ML models** for image analysis and predictions
-
-### Project Statistics
-- **Python code**: ~950 lines
-- **ESP32 firmware**: ~290 lines
-- **Deployment**: Native Ubuntu 24.04 with systemd (no Docker)
-- **Production Server**: 157.230.250.226 (DigitalOcean, 512MB RAM)
 
 ## 📁 Project Structure
 
@@ -113,7 +109,7 @@ ESP32 Sensors → MQTT → Mosquitto → Telegraf → InfluxDB (Local)
 - InfluxDB v2 output plugin
 
 #### InfluxDB
-- Time-series storage (local at 127.0.0.1:8086)
+- Time-series storage (local at 157.230.250.226:8086)
 - Bucket: sensor_data
 - 30-day retention policy
 
