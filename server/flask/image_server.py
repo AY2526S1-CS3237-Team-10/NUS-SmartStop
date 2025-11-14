@@ -3,7 +3,8 @@ from datetime import datetime
 import os
 import csv
 import json
-from functools import wraps
+import subprocess
+import sys
 
 app = Flask(__name__)
 import torch
@@ -12,6 +13,8 @@ from torchvision import models
 import torch.nn as nn
 from PIL import Image
 import paho.mqtt.client as mqtt
+from functools import wraps
+
 
 # Directories
 BASE_DIR = '/root/cs3237_server'
@@ -27,6 +30,12 @@ MQTT_TOPIC = "nus-smartstop/crowd/data"
 
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
+# Initialize metadata CSV
+if not os.path.exists(METADATA_FILE):
+    with open(METADATA_FILE, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['timestamp', 'filename', 'size_bytes', 'device_id'])
+        
 # Add your API key here
 API_KEY = "Complex_Secret_Key_Group10_2025"
 
@@ -49,7 +58,7 @@ def require_api_key(f):
             print(f"⛔ [Auth] Unauthorized access attempt from {request.remote_addr}")
             return jsonify({'error': 'Unauthorized: Invalid or missing API Key'}), 401
     return decorated_function
-        
+
 # =========================================
 # ========= GLOBAL ML OBJECTS ============
 # =========================================
@@ -249,6 +258,57 @@ def health():
         'disk_free_gb': round(disk.free / (1024**3), 2)
     }), 200
 
+@app.route('/predict', methods=['GET'])
+def predict_capacity():
+    """
+    XGBoost bus stop capacity prediction endpoint.
+    Reads from pre-cached prediction file (updated by background service).
+    Returns instantly without running inference.
+    """
+    try:
+        cache_file = os.path.join(BASE_DIR, 'prediction_cache.json')
+        
+        # Check if cache file exists
+        if not os.path.exists(cache_file):
+            return jsonify({
+                'success': False,
+                'capacity': -1,
+                'error': 'Prediction cache not ready. Start background_predictor.py first.'
+            }), 503  # Service Unavailable
+        
+        # Read cached prediction
+        with open(cache_file, 'r') as f:
+            cache_data = json.load(f)
+        
+        # Calculate age of prediction
+        from datetime import datetime
+        cache_time = datetime.fromisoformat(cache_data['timestamp'])
+        age_seconds = (datetime.now() - cache_time).total_seconds()
+        
+        # Add age to response
+        response = cache_data.copy()
+        response['age_seconds'] = round(age_seconds, 1)
+        response['cache_time'] = cache_data['timestamp']
+        
+        print(f"[PREDICT] Served from cache: capacity={cache_data['capacity']}, age={age_seconds:.1f}s")
+        
+        return jsonify(response), 200
+    
+    except json.JSONDecodeError:
+        return jsonify({
+            'success': False,
+            'capacity': -1,
+            'error': 'Cache file corrupted'
+        }), 500
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'capacity': -1,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/', methods=['GET'])
 def index():
     """Simple web gallery"""
@@ -277,6 +337,7 @@ def index():
             <ul>
                 <li><a href="/health">/health</a> - Server status</li>
                 <li><a href="/images">/images</a> - List images (JSON)</li>
+                <li><a href="/predict">/predict</a> - XGBoost capacity prediction</li>
                 <li>/upload - POST endpoint for images</li>
             </ul>
         </div>
