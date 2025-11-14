@@ -12,30 +12,43 @@ const int trigPins[SENSOR_COUNT] = {5, 22, 13};
 const int echoPins[SENSOR_COUNT] = {18, 23, 14};
 const String SECTION_NAMES[SENSOR_COUNT] = {"LEFT", "CENTER", "RIGHT"};
 
-const int MAX_DISTANCES[SENSOR_COUNT] = {9, 9, 10};
+const float MIN_DISTANCE = 0.0; // cm
 const int READ_INTERVAL = 3000; 
 
-int sensorDistances[SENSOR_COUNT];
-bool sensorStates[SENSOR_COUNT]; // true = occupied
-float density = 0.0; // overall bus stop density
+// Moving average parameters
+const int MOVING_AVG_SIZE = 3;  // Number of samples in the moving average
+float sensorBuffer[SENSOR_COUNT][MOVING_AVG_SIZE]; 
+int bufferIndex[SENSOR_COUNT] = {0};
+
+float baseline[SENSOR_COUNT];       // baseline floor distances
+float triggerThreshold[SENSOR_COUNT]; // baseline - buffer
+const float BUFFER = 0.2;           // buffer in cm below baseline to prevent false positives
+
+float sensorDistances[SENSOR_COUNT];
+bool sensorStates[SENSOR_COUNT];
+float density = 0.0;
 
 ESP32MQTTClient mqttClient;
 
-int readSensor(int index);
+float readSensor(int index);
 void readAllSensors();
 void publishData();
 int occupiedVal(bool state);
 void calculateDensity();
+void calibrateSensors();
+float movingAverage(int sensorIndex, float newReading);
 
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, pass);
-  delay(1000);
+  delay(500);
 
   for (int i = 0; i < SENSOR_COUNT; i++) {
     pinMode(trigPins[i], OUTPUT);
     pinMode(echoPins[i], INPUT);
     digitalWrite(trigPins[i], LOW);
+    // Initialize buffer to baseline-like values
+    for (int j = 0; j < MOVING_AVG_SIZE; j++) sensorBuffer[i][j] = 0;
   }
 
   // Setup MQTT
@@ -44,7 +57,9 @@ void setup() {
   mqttClient.setKeepAlive(30);
   mqttClient.enableLastWillMessage("nus-smartstop/lwt", "Ultrasonic node offline");
   mqttClient.loopStart();
-  delay(2000);  
+  delay(2000);
+
+  calibrateSensors(); // calibrate baseline and set thresholds
 }
 
 void loop() {
@@ -54,68 +69,118 @@ void loop() {
   delay(READ_INTERVAL);
 }
 
+void calibrateSensors() {
+  Serial.println("\nCALIBRATION MODE - Make sure bus stop is empty!");
+  delay(4000); 
+
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+    float total = 0;
+    const int samples = 5;
+    Serial.print("Calibrating ");
+    Serial.println(SECTION_NAMES[i]);
+
+    for (int j = 0; j < samples; j++) {
+      float d = readSensor(i);
+      total += d;
+      delay(400);
+    }
+    baseline[i] = total / samples;
+    triggerThreshold[i] = baseline[i] - BUFFER;
+
+    for (int k = 0; k < MOVING_AVG_SIZE; k++) sensorBuffer[i][k] = baseline[i];
+
+    Serial.print("Baseline for ");
+    Serial.print(SECTION_NAMES[i]);
+    Serial.print(": ");
+    Serial.print(baseline[i]);
+    Serial.print(" cm, Trigger threshold: ");
+    Serial.println(triggerThreshold[i]);
+  }
+  Serial.println("Calibration complete!");
+}
+
 void readAllSensors() {
-  for (int i = 0; i < SENSOR_COUNT; i++) 
-  {
-  sensorDistances[i] = readSensor(i);
-  sensorStates[i] = (sensorDistances[i] > 0 && sensorDistances[i] <= MAX_DISTANCES[i]);
-  delay(600); 
+  Serial.println("\nReading sensors");
+
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+
+    delay(80);
+
+    float rawReading = readSensor(i);
+    sensorDistances[i] = movingAverage(i, rawReading);
+
+    // Trigger if distance drops below threshold (buffered below baseline)
+    sensorStates[i] = (sensorDistances[i] > 0 && sensorDistances[i] <= triggerThreshold[i]);
+
+    delay(60);
   }
 
-  Serial.println("\n Sensor Readings ");
+  Serial.println("\nSensor Readings");
   for (int i = 0; i < SENSOR_COUNT; i++) {
     Serial.print(SECTION_NAMES[i]);
     Serial.print(": ");
-    if (sensorDistances[i] == 0) {
-      Serial.println("[NO SIGNAL]");
-    } 
-    else {
-      Serial.print(sensorDistances[i]);
-      Serial.print(" cm -> ");
-      Serial.println(sensorStates[i] ? "OCCUPIED" : "EMPTY");
-    }
+    Serial.print(sensorDistances[i]);
+    Serial.print(" cm -> ");
+    Serial.println(sensorStates[i] ? "OCCUPIED" : "EMPTY");
   }
 }
 
-int readSensor(int i) {
-  const int samples = 3;   // take average 
-  long total = 0;
+
+float movingAverage(int sensorIndex, float newReading) {
+  sensorBuffer[sensorIndex][bufferIndex[sensorIndex]] = newReading;
+  bufferIndex[sensorIndex] = (bufferIndex[sensorIndex] + 1) % MOVING_AVG_SIZE;
+
+  float sum = 0;
+  for (int i = 0; i < MOVING_AVG_SIZE; i++) sum += sensorBuffer[sensorIndex][i];
+  return sum / MOVING_AVG_SIZE;
+}
+
+float readSensor(int i) {
+  const int samples = 3;
+  float total = 0;
   int validCount = 0;
 
   for (int s = 0; s < samples; s++) {
+
+    // Ensure no echo from previous sensor is still around
+    delay(5);
+
+    // Trigger the ultrasonic pulse
     digitalWrite(trigPins[i], LOW);
-    delayMicroseconds(2);
+    delayMicroseconds(3);
     digitalWrite(trigPins[i], HIGH);
     delayMicroseconds(10);
     digitalWrite(trigPins[i], LOW);
 
+    // Listen for echo (timeout prevents blocking)
     long duration = pulseIn(echoPins[i], HIGH, 30000);
+
     if (duration > 0) {
-      total += duration * 0.034 / 2; // convert to cm
+      float distance = duration * 0.034 / 2.0;
+      total += distance;
       validCount++;
     }
-    delay(50);
+
+    delay(40);  // separation between multiple readings of same sensor
   }
 
   if (validCount == 0) return 0;
-  return total / validCount; // average result
+  return total / validCount;
 }
 
 int occupiedVal(bool state) {
   return state ? 1 : 0;
 }
 
-//added a density number for how crowded the bus stop is
 void calculateDensity() {
   int triggeredCount = 0;
   for (int i = 0; i < SENSOR_COUNT; i++) {
     if (sensorStates[i]) triggeredCount++;
   }
-  density = triggeredCount / (float)SENSOR_COUNT; 
+  density = triggeredCount / (float)SENSOR_COUNT;
   Serial.print("Bus stop density: ");
   Serial.println(density);
 }
-
 
 void publishData() {
   if (!mqttClient.isConnected()) {
@@ -126,9 +191,9 @@ void publishData() {
   char payload[400];
   snprintf(payload, sizeof(payload),
            "{\"sensors\": {"
-           "\"LEFT\": {\"distance\": %d, \"occupied\": %d}, "
-           "\"CENTER\": {\"distance\": %d, \"occupied\": %d}, "
-           "\"RIGHT\": {\"distance\": %d, \"occupied\": %d}}, "
+           "\"LEFT\": {\"distance\": %.2f, \"occupied\": %d}, "
+           "\"CENTER\": {\"distance\": %.2f, \"occupied\": %d}, "
+           "\"RIGHT\": {\"distance\": %.2f, \"occupied\": %d}}, "
            "\"density\": %.2f}",
            sensorDistances[0], occupiedVal(sensorStates[0]),
            sensorDistances[1], occupiedVal(sensorStates[1]),
@@ -140,7 +205,6 @@ void publishData() {
   Serial.println(payload);
   mqttClient.publish(mqttTopic, payload, 0, false);
 }
-
 
 void onMqttConnect(esp_mqtt_client* client) {
   Serial.println("MQTT Connected!");
