@@ -31,11 +31,11 @@
 #define SERVO_PIN     13
 
 // WiFi Credentials
-const char* ssid = "Ken Phone";
-const char* password = "Estri333";
+const char* ssid = ""; //Input WIFI or Hotspot SSID
+const char* password = ""; //Input WIFI or Hotspot Password
 
 // Server Configuration
-const char* serverURL = "http://157.230.250.226:5000/predict";
+const char* serverURL = ""; //Input Server URL with predict Endpoint
 
 // ============================
 // ====== OBJECTS & VARS ======
@@ -53,9 +53,9 @@ unsigned long lastUpdate = 0;
 const unsigned long UPDATE_INTERVAL = 2000; // Update LCD & Data every 2 seconds
 
 unsigned long lastPredictionRequest = 0;
-const unsigned long PREDICTION_INTERVAL = 60000; // Request prediction every 1 minute
+const unsigned long PREDICTION_INTERVAL = 30000; // Request prediction every 30 seconds
 
-// State & Data Variables (From Code 1)
+// State & Data Variables
 int peopleCount = 0;
 float distance = 0.0;
 bool voiceDetected = false;
@@ -221,7 +221,7 @@ void startPredictionRequest() {
     Serial.printf("Predicted Capacity: %.1f people\n", predictedCapacity);
     
     // Update isFullCapacity based on prediction
-    bool newState = (predictedCapacity > 22.5);
+    bool newState = (predictedCapacity > 15);
     
     if (newState != isFullCapacity) {
       isFullCapacity = newState;
@@ -271,7 +271,7 @@ void startPredictionRequest() {
 void setup() {
   Serial.begin(115200);
 
-  // 1. Init LCD (Code 1 Syntax)
+  // 1. Init LCD
   Wire.begin(); // Defaults to SDA=21, SCL=22 on ESP32
   lcd.init();
   lcd.backlight();
@@ -337,7 +337,6 @@ void setup() {
 // ====== LOOP ================
 // ============================
 void loop() {
-  // --- IMPORTANT: Audio loop must run fast and often ---
   handleAudioLogic();
 
   // --- PREDICTION REQUEST (Every 30 Seconds) ---
@@ -351,27 +350,17 @@ void loop() {
   if (millis() - lastUpdate >= UPDATE_INTERVAL) {
     lastUpdate = millis();
 
-    // 1. GENERATE DATA (From Code 1)
+    // 1. GENERATE DATA 
     // We simulate sensors here. 
     peopleCount = random(0, 12);        // Mock people count (0 to 12)
     distance = random(20, 200) / 10.0;  // Mock distance
     voiceDetected = random(0, 2);       // Mock voice
 
-    // NOTE: isFullCapacity is now controlled by requestCapacityPrediction()
-    // based on server prediction, not local peopleCount
-
-    // 2. UPDATE LCD (Using Code 1 Syntax)
+    // 2. UPDATE LCD 
     lcd.clear();
     
-    // Line 1: Crowd Info
+    // Line 1: Predicted Capacity
     lcd.setCursor(0, 0);
-    lcd.print("Ppl:");
-    lcd.print(peopleCount);
-    lcd.print(" Dist:");
-    lcd.print(distance, 1); 
-
-    // Line 2: Predicted Capacity & Status
-    lcd.setCursor(0, 1);
     if (predictedCapacity >= 0) {
       lcd.print("Cap:");
       lcd.print((int)predictedCapacity);
@@ -380,6 +369,8 @@ void loop() {
       lcd.print("Cap:-- ");
     }
 
+    // Line 2: Predicted Status
+    lcd.setCursor(0, 1);
     // Simple status indicator
     if (isFullCapacity) {
         lcd.print("[FULL]");
