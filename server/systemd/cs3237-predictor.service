@@ -1,0 +1,19 @@
+[Unit]
+Description=CS3237 Background Prediction Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/cs3237_server/Deployment
+ExecStart=/root/venv/bin/python /root/cs3237_server/Deployment/background_predictor.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cs3237-predictor
+
+[Install]
+WantedBy=multi-user.target
