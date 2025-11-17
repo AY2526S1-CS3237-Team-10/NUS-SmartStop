@@ -42,7 +42,14 @@ NUS-SmartStop/
 │   ├── ultrasonic_sensors/    # Ultrasonic sensor code
 │   └── ESP32_Actuator/        # Actuator control code
 ├── server/
-│   ├── flask/                 # Flask image server
+│   ├── flask/                # Flask image server
+│   │   ├── Deployment/       # Flask Predictor Deployment
+│   │   │   ├── busstop_xgboost.json       # Json File for XGBoost Model Parameters
+│   │   │   ├── busstop_xgboost_scaler.pkl       # Pickle File for XGBoost Model refence
+│   │   │   ├── background_predictor.py       # Background Script for prediction running
+│   │   │   ├── predict.py       # Simple inference script for capcity prediction
+│   │   │   ├── query_influxdb.py  # InfluxDB data extraction
+│   │   │   └── run_inference.py # Activation code for Data extraction, cleaning and prediction
 │   │   ├── image_server.py   # Flask application with dual upload modes
 │   │   └── esp32cam_image_server.py # Flask with auto image processing
 │   ├── influxdb/             # InfluxDB client
@@ -51,9 +58,14 @@ NUS-SmartStop/
 │   │   └── mqtt_client.py    # MQTT client utilities
 │   └── systemd/              # Systemd service files
 │       ├── flask-image-server.service
+│       ├── cs3237-predictor.service
 │       ├── telegraf.service
 │       └── mosquitto-cs3237.conf
 ├── ml_models/                # ML models
+│   ├── XGBoost_Training/                # XGBoost Training Model
+│   │   ├── prepare_data_xgboost.py     # Cleaning InfluxDB for training
+│   │   ├── query_influxdb.py     # InfluxDB data extraction
+│   │   └── train_xgboost.py       # XGBoost model training
 │   ├── Crowd Classification CAM.ipynb  # CNN training notebook
 │   └── Test classification.ipynb       # XGBoost model notebook
 ├── telegraf.conf             # Telegraf MQTT→InfluxDB bridge config
@@ -77,6 +89,13 @@ ESP32-CAM → HTTP POST → Flask Server → ML Inference (CNN/XGBoost)
 **Sensor Data Flow:**
 ```
 ESP32 Sensors → MQTT → Mosquitto → Telegraf → InfluxDB (Local)
+```
+
+**Predictor Data Flow:**
+```
+InfluxDB → Flask Server → ESP32 Sensors
+                ↓ ↑
+       ML Inference (XGBoost)
 ```
 
 ### Key Components
