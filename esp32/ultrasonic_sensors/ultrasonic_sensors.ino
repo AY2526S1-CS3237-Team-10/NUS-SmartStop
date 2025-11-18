@@ -2,8 +2,8 @@
 #include <WiFi.h>
 #include "ESP32MQTTClient.h"
 
-const char* ssid = "Tricia lim"; 
-const char* pass = "triciaisthebest"; 
+const char* ssid = ""; 
+const char* pass = ""; 
 const char* mqttServer = "mqtt://157.230.250.226:1883";
 const char* mqttTopic = "nus-smartstop/ultrasonic/data";
 
@@ -47,7 +47,6 @@ void setup() {
     pinMode(trigPins[i], OUTPUT);
     pinMode(echoPins[i], INPUT);
     digitalWrite(trigPins[i], LOW);
-    // Initialize buffer to baseline-like values
     for (int j = 0; j < MOVING_AVG_SIZE; j++) sensorBuffer[i][j] = 0;
   }
 
@@ -70,7 +69,7 @@ void loop() {
 }
 
 void calibrateSensors() {
-  Serial.println("\nCALIBRATION MODE - Make sure bus stop is empty!");
+  Serial.println("\nCALIBRATION MODE");
   delay(4000); 
 
   for (int i = 0; i < SENSOR_COUNT; i++) {
@@ -108,8 +107,6 @@ void readAllSensors() {
 
     float rawReading = readSensor(i);
     sensorDistances[i] = movingAverage(i, rawReading);
-
-    // Trigger if distance drops below threshold (buffered below baseline)
     sensorStates[i] = (sensorDistances[i] > 0 && sensorDistances[i] <= triggerThreshold[i]);
 
     delay(60);
@@ -141,18 +138,12 @@ float readSensor(int i) {
   int validCount = 0;
 
   for (int s = 0; s < samples; s++) {
-
-    // Ensure no echo from previous sensor is still around
     delay(5);
-
-    // Trigger the ultrasonic pulse
     digitalWrite(trigPins[i], LOW);
     delayMicroseconds(3);
     digitalWrite(trigPins[i], HIGH);
     delayMicroseconds(10);
     digitalWrite(trigPins[i], LOW);
-
-    // Listen for echo (timeout prevents blocking)
     long duration = pulseIn(echoPins[i], HIGH, 30000);
 
     if (duration > 0) {
@@ -161,7 +152,7 @@ float readSensor(int i) {
       validCount++;
     }
 
-    delay(40);  // separation between multiple readings of same sensor
+    delay(40);  
   }
 
   if (validCount == 0) return 0;
